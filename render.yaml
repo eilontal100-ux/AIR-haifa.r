@@ -1,0 +1,39 @@
+# Render Blueprint. Configure SMTP_* secrets and BASE_URL in the Render dashboard.
+databases:
+  - name: air-haifa-swap-db
+    databaseName: airhaifa_swap
+    user: airhaifa
+    plan: basic-256mb
+services:
+  - type: web
+    name: air-haifa-swap
+    runtime: node
+    plan: starter
+    buildCommand: npm install --omit=dev
+    startCommand: npm run db:setup && npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: air-haifa-swap-db
+          property: connectionString
+      - key: DATABASE_SSL
+        value: "false"
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: BASE_URL
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: SMTP_SECURE
+        value: "false"
