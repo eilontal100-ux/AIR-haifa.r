@@ -8,13 +8,14 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const { pool, query } = require('./db');
 const { normalizeEmail, clean, parseListing } = require('./validation');
-const mail = require('./mail');
 
 const app = express();
 const prod = process.env.NODE_ENV === 'production';
 const baseUrl = process.env.BASE_URL;
 if (!baseUrl) throw new Error('Set BASE_URL in .env');
-if (prod && (!baseUrl.startsWith('https://') || !mail.smtpReady)) throw new Error('Production requires HTTPS BASE_URL and configured SMTP');
+if (prod && !baseUrl.startsWith('https://')) throw new Error('Production requires an HTTPS BASE_URL');
+// Optional shared code every pilot must enter with their email to sign in.
+const accessCode = process.env.ACCESS_CODE || '';
 app.disable('x-powered-by');
 app.set('trust proxy', prod ? 1 : 'loopback');
 app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'"], imgSrc: ["'self'", 'data:'], connectSrc: ["'self'"], formAction: ["'self'"], objectSrc: ["'none'"] } } }));
@@ -58,38 +59,19 @@ function listingJSON(row) {
     interestCount: row.interest_count, createdAt: row.created_at };
 }
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
-app.post('/api/auth/request', loginLimiter, safe(async (req, res) => {
+app.get('/api/auth/options', (req, res) => res.json({ accessCodeRequired: !!accessCode }));
+app.post('/api/auth/login', loginLimiter, safe(async (req, res) => {
   const email = normalizeEmail(req.body.email);
-  // Deliberately identical responses for unknown / known accounts to avoid account enumeration.
-  const response = { message: 'If this address is approved, a sign-in link will arrive shortly.' };
-  if (!email) return res.json(response);
-  const { rows } = await query('SELECT id FROM pilots WHERE email=$1', [email]);
-  if (!rows.length) return res.json(response);
-  const token = newToken();
-  await query('INSERT INTO login_tokens(pilot_id,token_hash,expires_at) VALUES($1,$2,NOW()+INTERVAL \'15 minutes\')', [rows[0].id, tokenHash(token)]);
-  const link = `${baseUrl.replace(/\/$/, '')}/auth/verify?token=${encodeURIComponent(token)}`;
-  await mail.send(email, 'Your Air Haifa Swap sign-in link', `Use this single-use link within 15 minutes:\n\n${link}\n\nIf you did not request it, you can ignore this email.`);
-  res.json(response);
-}));
-app.get('/auth/verify', safe(async (req, res) => {
-  const token = typeof req.query.token === 'string' ? req.query.token : '';
-  if (!/^[\w-]{40,100}$/.test(token)) return res.redirect('/?auth=invalid');
-  const client = await pool.connect();
-  let pilotId;
-  try {
-    await client.query('BEGIN');
-    const { rows } = await client.query(`UPDATE login_tokens SET consumed_at=NOW() WHERE token_hash=$1
-       AND consumed_at IS NULL AND expires_at>NOW() RETURNING pilot_id`, [tokenHash(token)]);
-    if (!rows.length) { await client.query('ROLLBACK'); return res.redirect('/?auth=invalid'); }
-    pilotId = rows[0].pilot_id;
-    const session = newToken();
-    await client.query("INSERT INTO sessions(pilot_id,token_hash,expires_at) VALUES ($1,$2,NOW()+INTERVAL '7 days')", [pilotId, tokenHash(session)]);
-    await client.query('COMMIT');
-    setCookie(res, session);
-    // Token is removed from browser address bar on redirect.
-    return res.redirect('/?auth=ok');
-  } catch (err) { await client.query('ROLLBACK').catch(() => {}); throw err; }
-  finally { client.release(); }
+  if (accessCode) {
+    const given = tokenHash(typeof req.body.accessCode === 'string' ? req.body.accessCode : '');
+    if (!crypto.timingSafeEqual(Buffer.from(given), Buffer.from(tokenHash(accessCode)))) return sendError(res, 401, 'Wrong email or access code.');
+  }
+  const { rows } = email ? await query('SELECT id FROM pilots WHERE email=$1', [email]) : { rows: [] };
+  if (!rows.length) return sendError(res, 401, accessCode ? 'Wrong email or access code.' : 'This email is not on the approved pilot list.');
+  const session = newToken();
+  await query("INSERT INTO sessions(pilot_id,token_hash,expires_at) VALUES ($1,$2,NOW()+INTERVAL '7 days')", [rows[0].id, tokenHash(session)]);
+  setCookie(res, session);
+  res.json({ ok: true });
 }));
 app.get('/api/me', auth, (req, res) => res.json({ pilot: { id: String(req.pilot.id), email: req.pilot.email, displayName: req.pilot.display_name, role: req.pilot.role } }));
 app.post('/api/auth/logout', auth, safe(async (req, res) => {
