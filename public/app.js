@@ -14,7 +14,7 @@ async function api(url, options={}) {
  if(!response.ok)throw new Error(payload.error||`Request failed (${response.status})`);
  return payload;
 }
-function showLogin(){ $('login').hidden=false;$('app').hidden=true;api('/api/auth/options').then(r=>{$('accessCodeField').hidden=!r.accessCodeRequired;$('accessCode').required=r.accessCodeRequired;}).catch(()=>{}); }
+function showLogin(){ $('login').hidden=false;$('app').hidden=true;api('/api/auth/options').then(r=>{$('accessCodeField').hidden=!r.accessCodeRequired;$('accessCode').required=r.accessCodeRequired;$('loginMessage').className='form-message ok';$('loginMessage').textContent=r.firstSignIn?'First sign-in: the email you enter becomes the administrator account.':'';}).catch(()=>{}); }
 function showApp(){ $('login').hidden=true;$('app').hidden=false;updateProfile();$('adminNav').hidden=state.me.role!=='admin';$('displayName').value=state.me.displayName||''; }
 function updateProfile(){ const name=state.me.displayName||state.me.email.split('@')[0];$('profileName').textContent=name;$('profileEmail').textContent=state.me.email;$('avatar').textContent=name[0].toUpperCase(); }
 async function boot(){ try {const r=await api('/api/me');state.me=r.pilot;showApp();await refresh();}catch(err){showLogin();} }

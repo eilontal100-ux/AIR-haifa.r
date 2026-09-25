@@ -20,7 +20,6 @@ if (process.env.DATABASE_URL) {
   const { normalizeEmail } = require('./validation');
 
   const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
-  if (!adminEmail) throw new Error('Set ADMIN_EMAIL to one of the four allowed pilot email addresses');
   const dataDir = process.env.DATA_DIR;
   if (dataDir) fs.mkdirSync(dataDir, { recursive: true });
   const db = new PGlite(dataDir || undefined);
@@ -28,8 +27,8 @@ if (process.env.DATABASE_URL) {
   const ready = (async () => {
     await db.waitReady;
     await db.exec(fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8'));
-    await db.query("INSERT INTO pilots(email, role) VALUES ($1, 'admin') ON CONFLICT(email) DO NOTHING", [adminEmail]);
-    console.log(`Built-in database ready (${dataDir ? `stored in ${dataDir}` : 'in memory, lost on restart'}). Bootstrap admin: ${adminEmail}`);
+    if (adminEmail) await db.query("INSERT INTO pilots(email, role) VALUES ($1, 'admin') ON CONFLICT(email) DO NOTHING", [adminEmail]);
+    console.log(`Built-in database ready (${dataDir ? `stored in ${dataDir}` : 'in memory, lost on restart'}). Bootstrap admin: ${adminEmail || 'first pilot to sign in'}`);
   })();
   ready.catch(err => { console.error(err); process.exit(1); });
 
