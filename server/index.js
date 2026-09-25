@@ -50,8 +50,9 @@ function admin(req, res, next) { if (req.pilot.role !== 'admin') return sendErro
 function safe(fn) { return (req, res, next) => Promise.resolve(fn(req, res)).catch(next); }
 function setCookie(res, token) { res.cookie('pilot_session', token, { httpOnly: true, sameSite: 'lax', secure: prod, path: '/', maxAge: 7 * 86400000 }); }
 const listingSelect = `SELECT l.*, p.email AS owner_email, p.display_name AS owner_name,
-  m.email AS matched_email, (SELECT count(*)::int FROM interests i WHERE i.listing_id=l.id AND i.status='pending') AS interest_count
-  FROM listings l JOIN pilots p ON p.id=l.owner_id LEFT JOIN pilots m ON m.id=l.matched_with`;
+  m.email AS matched_email, COALESCE(ic.n, 0) AS interest_count
+  FROM listings l JOIN pilots p ON p.id=l.owner_id LEFT JOIN pilots m ON m.id=l.matched_with
+  LEFT JOIN (SELECT listing_id, count(*)::int AS n FROM interests WHERE status='pending' GROUP BY listing_id) ic ON ic.listing_id=l.id`;
 function listingJSON(row) {
   return { id: String(row.id), ownerId: String(row.owner_id), ownerEmail: row.owner_email, ownerName: row.owner_name,
     intent: row.intent, kind: row.kind, startsAt: row.starts_at, endsAt: row.ends_at, flightNumber: row.flight_number,
@@ -169,7 +170,7 @@ app.post('/api/listings/:id/interest', auth, safe(async (req, res) => {
   if (!/^\d+$/.test(req.params.id)) return sendError(res, 400, 'Invalid listing ID.');
   const message = clean(req.body.message, 1000);
   const { rows } = await query(`INSERT INTO interests(listing_id,from_pilot_id,message)
-    SELECT id,$2,$3 FROM listings WHERE id=$1 AND owner_id<>$2 AND status='open'
+    SELECT id,$2::bigint,$3 FROM listings WHERE id=$1 AND owner_id<>$2 AND status='open'
     ON CONFLICT(listing_id,from_pilot_id) DO UPDATE SET message=EXCLUDED.message,status='pending',updated_at=NOW()
     RETURNING id`, [req.params.id, req.pilot.id, message]);
   if (!rows.length) return sendError(res, 400, 'This listing is unavailable or belongs to you.');
