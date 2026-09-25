@@ -11,6 +11,7 @@
     "db:setup": "node server/migrate.js"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",

@@ -1,9 +1,14 @@
 'use strict';
+require('dotenv').config();
 const fs = require('node:fs');
 const path = require('node:path');
-const { pool } = require('./db');
 const { normalizeEmail } = require('./validation');
 (async () => {
+  if (!process.env.DATABASE_URL) {
+    console.log('No DATABASE_URL: using the built-in database, which is set up when the server starts.');
+    return;
+  }
+  const { pool } = require('./db');
   const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
   if (!adminEmail) throw new Error('Set ADMIN_EMAIL to one of the four allowed pilot email addresses');
   const client = await pool.connect();
