@@ -1,4 +1,4 @@
-# Render Blueprint. Configure SMTP_* secrets and BASE_URL in the Render dashboard.
+# Render Blueprint. Configure BASE_URL (and optionally ACCESS_CODE) in the Render dashboard.
 databases:
   - name: air-haifa-swap-db
     databaseName: airhaifa_swap
@@ -25,15 +25,5 @@ services:
         sync: false
       - key: BASE_URL
         sync: false
-      - key: SMTP_HOST
+      - key: ACCESS_CODE
         sync: false
-      - key: SMTP_PORT
-        value: "587"
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASSWORD
-        sync: false
-      - key: SMTP_FROM
-        sync: false
-      - key: SMTP_SECURE
-        value: "false"
