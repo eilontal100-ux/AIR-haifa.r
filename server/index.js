@@ -11,7 +11,8 @@ const { normalizeEmail, clean, parseListing } = require('./validation');
 
 const app = express();
 const prod = process.env.NODE_ENV === 'production';
-const baseUrl = process.env.BASE_URL;
+// Render sets RENDER_EXTERNAL_URL to the service's public address.
+const baseUrl = process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL;
 if (!baseUrl) throw new Error('Set BASE_URL in .env');
 if (prod && !baseUrl.startsWith('https://')) throw new Error('Production requires an HTTPS BASE_URL');
 // Optional shared code every pilot must enter with their email to sign in.
@@ -59,17 +60,34 @@ function listingJSON(row) {
     interestCount: row.interest_count, createdAt: row.created_at };
 }
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
-app.get('/api/auth/options', (req, res) => res.json({ accessCodeRequired: !!accessCode }));
+app.get('/api/auth/options', safe(async (req, res) => {
+  const { rows } = await query('SELECT count(*)::int AS n FROM pilots');
+  res.json({ accessCodeRequired: !!accessCode, firstSignIn: rows[0].n === 0 });
+}));
+// Find the pilot for this email. With no pilots yet (ADMIN_EMAIL not set),
+// the first pilot to sign in becomes the admin.
+async function findOrClaimPilot(email) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(839117)'); // same lock as adding pilots
+    let { rows } = await client.query('SELECT id FROM pilots WHERE email=$1', [email]);
+    if (!rows.length) ({ rows } = await client.query("INSERT INTO pilots(email, role) SELECT $1, 'admin' WHERE NOT EXISTS (SELECT 1 FROM pilots) RETURNING id", [email]));
+    await client.query('COMMIT');
+    return rows[0];
+  } catch (e) { await client.query('ROLLBACK').catch(() => {}); throw e; }
+  finally { client.release(); }
+}
 app.post('/api/auth/login', loginLimiter, safe(async (req, res) => {
   const email = normalizeEmail(req.body.email);
   if (accessCode) {
     const given = tokenHash(typeof req.body.accessCode === 'string' ? req.body.accessCode : '');
     if (!crypto.timingSafeEqual(Buffer.from(given), Buffer.from(tokenHash(accessCode)))) return sendError(res, 401, 'Wrong email or access code.');
   }
-  const { rows } = email ? await query('SELECT id FROM pilots WHERE email=$1', [email]) : { rows: [] };
-  if (!rows.length) return sendError(res, 401, accessCode ? 'Wrong email or access code.' : 'This email is not on the approved pilot list.');
+  const pilot = email && await findOrClaimPilot(email);
+  if (!pilot) return sendError(res, 401, accessCode ? 'Wrong email or access code.' : 'This email is not on the approved pilot list.');
   const session = newToken();
-  await query("INSERT INTO sessions(pilot_id,token_hash,expires_at) VALUES ($1,$2,NOW()+INTERVAL '7 days')", [rows[0].id, tokenHash(session)]);
+  await query("INSERT INTO sessions(pilot_id,token_hash,expires_at) VALUES ($1,$2,NOW()+INTERVAL '7 days')", [pilot.id, tokenHash(session)]);
   setCookie(res, session);
   res.json({ ok: true });
 }));

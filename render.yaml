@@ -1,4 +1,4 @@
-# Render Blueprint. Configure BASE_URL (and optionally ACCESS_CODE) in the Render dashboard.
+# Render Blueprint. Optionally configure ACCESS_CODE, ADMIN_EMAIL and BASE_URL in the Render dashboard.
 databases:
   - name: air-haifa-swap-db
     databaseName: airhaifa_swap
