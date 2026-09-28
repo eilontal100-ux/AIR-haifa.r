@@ -2,14 +2,42 @@
 require('dotenv').config();
 
 if (process.env.DATABASE_URL) {
+  const fs = require('node:fs');
+  const path = require('node:path');
   const { Pool } = require('pg');
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+  const { normalizeEmail } = require('./validation');
+  // Tolerate a pasted `psql 'postgresql://...'` snippet or surrounding quotes.
+  const url = process.env.DATABASE_URL.trim().replace(/^psql\s+/i, '').replace(/^(['"])(.*)\1$/, '$2');
+  const raw = new Pool({
+    connectionString: url,
     ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: true } : false,
     max: 10,
     idleTimeoutMillis: 30000,
   });
-  module.exports = { pool, query: (sql, params) => pool.query(sql, params) };
+  // Create the tables and bootstrap admin before the first query, whatever the start
+  // command; if the database is unreachable, the next query tries again.
+  async function setupSchema() {
+    const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
+    const client = await raw.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8'));
+      // Bootstrap the first admin. Existing pilots are not silently promoted.
+      if (adminEmail) await client.query("INSERT INTO pilots(email, role) VALUES ($1, 'admin') ON CONFLICT(email) DO NOTHING", [adminEmail]);
+      await client.query('COMMIT');
+      console.log('Database ready. Bootstrap admin:', adminEmail || 'first pilot to sign in');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally { client.release(); }
+  }
+  let ready;
+  const setup = () => (ready ??= setupSchema().catch(err => { ready = undefined; throw err; }));
+  const pool = {
+    async connect() { await setup(); return raw.connect(); },
+    end: () => raw.end(),
+  };
+  module.exports = { pool, query: async (sql, params) => { await setup(); return raw.query(sql, params); }, setup };
 } else {
   // No DATABASE_URL: keep the data in this process's memory using pg-mem, a
   // lightweight PostgreSQL emulator (small enough for a 512 MB instance). The
@@ -54,5 +82,5 @@ if (process.env.DATABASE_URL) {
     const client = await pool.connect();
     try { return await client.query(sql, params); } finally { client.release(); }
   };
-  module.exports = { pool, query };
+  module.exports = { pool, query, setup: () => ready };
 }

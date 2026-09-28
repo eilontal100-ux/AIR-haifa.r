@@ -6,7 +6,7 @@ const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const crypto = require('node:crypto');
 const path = require('node:path');
-const { pool, query } = require('./db');
+const { pool, query, setup } = require('./db');
 const { normalizeEmail, clean, parseListing } = require('./validation');
 
 const app = express();
@@ -224,13 +224,19 @@ app.post('/api/interests/:id/withdraw', auth, safe(async (req, res) => {
 }));
 // This is a matching board, not an official roster: actual duty swaps require separate company approval.
 app.use(express.static(path.join(__dirname, '..', 'public'), { index: 'index.html' }));
+// Errors that mean the database is unreachable or misconfigured, not a bug in a request.
+const DB_ERROR_CODES = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'ECONNRESET', '28P01', '28000', '3D000', '08001', '08006', '57P03']);
+const isDatabaseError = err => DB_ERROR_CODES.has(err.code) || /SSL|Connection terminated|timeout exceeded when trying to connect|Invalid URL|password authentication/i.test(err.message || '');
 app.use((err, req, res, next) => {
-  console.error(err);
+  if (isDatabaseError(err)) console.error('Database connection problem. Check DATABASE_URL (and DATABASE_SSL) in the host settings:', err.message);
+  else console.error(err);
   if (res.headersSent) return next(err);
+  if (isDatabaseError(err)) return sendError(res, 503, "The app can't reach its database right now. If this keeps happening, the site owner should check the DATABASE_URL setting in Render.");
   sendError(res, 500, 'Something went wrong. Please try again.');
 });
 if (require.main === module) {
   const port = Number(process.env.PORT || 3000);
   app.listen(port, '0.0.0.0', () => console.log(`Air Haifa Swap listening at ${baseUrl}`));
+  setup().catch(err => console.error('Database setup failed; will retry on the next request. Check DATABASE_URL (and DATABASE_SSL):', err.message));
 }
 module.exports = app;
