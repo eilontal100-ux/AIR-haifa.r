@@ -1,4 +1,4 @@
-# Render Blueprint. Optionally configure ACCESS_CODE, ADMIN_EMAIL and BASE_URL in the Render dashboard.
+# Render Blueprint. Configure APP_PASSWORD, and optionally ADMIN_EMAIL and BASE_URL in the Render dashboard.
 databases:
   - name: air-haifa-swap-db
     databaseName: airhaifa_swap
@@ -25,5 +25,5 @@ services:
         sync: false
       - key: BASE_URL
         sync: false
-      - key: ACCESS_CODE
+      - key: APP_PASSWORD
         sync: false
