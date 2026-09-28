@@ -65,8 +65,15 @@ function listingJSON(row) {
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/api/auth/options', safe(async (req, res) => {
   const { rows } = await query('SELECT count(*)::int AS n FROM pilots');
-  res.json({ accessCodeRequired: !!accessCode, firstSignIn: rows[0].n === 0 });
+  res.json({ passwordRequired: !!accessCode, firstSignIn: rows[0].n === 0 });
 }));
+const passwordMatches = value => crypto.timingSafeEqual(
+  Buffer.from(tokenHash(typeof value === 'string' ? value : '')), Buffer.from(tokenHash(accessCode)));
+// Step 1 of sign-in: check the shared password before asking for an email.
+app.post('/api/auth/password', loginLimiter, (req, res) => {
+  if (accessCode && !passwordMatches(req.body.password)) return sendError(res, 401, 'Wrong password.');
+  res.json({ ok: true });
+});
 // Find the pilot for this email. With no pilots yet (ADMIN_EMAIL not set), the first
 // pilot to sign in becomes the admin; with a password set, new emails join as pilots
 // while there is a free seat. Returns { id } or { full: true } or undefined.
@@ -89,14 +96,13 @@ async function findOrClaimPilot(email) {
 }
 app.post('/api/auth/login', loginLimiter, safe(async (req, res) => {
   const email = normalizeEmail(req.body.email);
-  if (accessCode) {
-    const given = tokenHash(typeof req.body.accessCode === 'string' ? req.body.accessCode : '');
-    if (!crypto.timingSafeEqual(Buffer.from(given), Buffer.from(tokenHash(accessCode)))) return sendError(res, 401, 'Wrong password.');
-  }
+  if (accessCode && !passwordMatches(req.body.password)) return sendError(res, 401, 'Wrong password.');
   if (!email) return sendError(res, 400, 'Enter a valid email.');
   const pilot = await findOrClaimPilot(email);
   if (pilot?.full) return sendError(res, 403, 'All four pilot seats are taken. Ask the admin to remove someone first.');
   if (!pilot) return sendError(res, 401, 'This email is not on the approved pilot list.');
+  const name = clean(req.body.displayName, 90);
+  if (name) await query("UPDATE pilots SET display_name=$1 WHERE id=$2 AND display_name=''", [name, pilot.id]);
   const session = newToken();
   await query("INSERT INTO sessions(pilot_id,token_hash,expires_at) VALUES ($1,$2,NOW()+INTERVAL '7 days')", [pilot.id, tokenHash(session)]);
   setCookie(res, session);
