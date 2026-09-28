@@ -16,7 +16,7 @@ const baseUrl = process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL;
 if (!baseUrl) throw new Error('Set BASE_URL in .env');
 if (prod && !baseUrl.startsWith('https://')) throw new Error('Production requires an HTTPS BASE_URL');
 // Shared password every pilot enters with their email to sign in. When set, anyone
-// with the password can join (up to four pilots); without it, only approved emails can.
+// with the password can join; without it, only emails already on the list can.
 const accessCode = process.env.APP_PASSWORD || process.env.ACCESS_CODE || '';
 app.disable('x-powered-by');
 app.set('trust proxy', prod ? 1 : 'loopback');
@@ -75,8 +75,8 @@ app.post('/api/auth/password', loginLimiter, (req, res) => {
   res.json({ ok: true });
 });
 // Find the pilot for this email. With no pilots yet (ADMIN_EMAIL not set), the first
-// pilot to sign in becomes the admin; with a password set, new emails join as pilots
-// while there is a free seat. Returns { id } or { full: true } or undefined.
+// pilot to sign in becomes the admin; with a password set, new emails join as pilots.
+// Returns { id }, or undefined if the email may not sign in.
 async function findOrClaimPilot(email) {
   const client = await pool.connect();
   try {
@@ -84,11 +84,7 @@ async function findOrClaimPilot(email) {
     await client.query('SELECT pg_advisory_xact_lock(839117)'); // same lock as adding pilots
     let { rows } = await client.query('SELECT id FROM pilots WHERE email=$1', [email]);
     if (!rows.length) ({ rows } = await client.query("INSERT INTO pilots(email, role) SELECT $1, 'admin' WHERE NOT EXISTS (SELECT 1 FROM pilots) RETURNING id", [email]));
-    if (!rows.length && accessCode) {
-      const count = await client.query('SELECT count(*)::int AS n FROM pilots');
-      if (count.rows[0].n >= 4) { await client.query('ROLLBACK'); return { full: true }; }
-      ({ rows } = await client.query('INSERT INTO pilots(email) VALUES($1) RETURNING id', [email]));
-    }
+    if (!rows.length && accessCode) ({ rows } = await client.query('INSERT INTO pilots(email) VALUES($1) RETURNING id', [email]));
     await client.query('COMMIT');
     return rows[0];
   } catch (e) { await client.query('ROLLBACK').catch(() => {}); throw e; }
@@ -99,7 +95,6 @@ app.post('/api/auth/login', loginLimiter, safe(async (req, res) => {
   if (accessCode && !passwordMatches(req.body.password)) return sendError(res, 401, 'Wrong password.');
   if (!email) return sendError(res, 400, 'Enter a valid email.');
   const pilot = await findOrClaimPilot(email);
-  if (pilot?.full) return sendError(res, 403, 'All four pilot seats are taken. Ask the admin to remove someone first.');
   if (!pilot) return sendError(res, 401, 'This email is not on the approved pilot list.');
   const name = clean(req.body.displayName, 90);
   if (name) await query("UPDATE pilots SET display_name=$1 WHERE id=$2 AND display_name=''", [name, pilot.id]);
@@ -130,11 +125,9 @@ app.post('/api/admin/pilots', auth, admin, safe(async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query('SELECT pg_advisory_xact_lock(839117)'); // serialize capacity checks across server instances
+    await client.query('SELECT pg_advisory_xact_lock(839117)'); // same lock as sign-up
     const existing = await client.query('SELECT id FROM pilots WHERE email=$1', [email]);
     if (existing.rowCount) { await client.query('ROLLBACK'); return sendError(res, 409, 'Pilot already exists.'); }
-    const count = await client.query('SELECT count(*)::int AS n FROM pilots');
-    if (count.rows[0].n >= 4) { await client.query('ROLLBACK'); return sendError(res, 409, 'Maximum of four approved pilots reached.'); }
     await client.query('INSERT INTO pilots(email) VALUES($1)', [email]);
     await client.query('COMMIT');
     res.status(201).json({ ok: true });
