@@ -51,3 +51,20 @@ CREATE TABLE IF NOT EXISTS interests (
   UNIQUE(listing_id, from_pilot_id)
 );
 CREATE INDEX IF NOT EXISTS idx_interests_listing ON interests(listing_id);
+-- Web push: one row per subscribed browser/device, with that device's choices.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  pilot_id BIGINT NOT NULL REFERENCES pilots(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  new_listings BOOLEAN NOT NULL DEFAULT FALSE,
+  my_exchanges BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_push_pilot ON push_subscriptions(pilot_id);
+-- Small key/value store, e.g. the generated web push (VAPID) keys.
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);

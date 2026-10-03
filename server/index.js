@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const crypto = require('node:crypto');
 const path = require('node:path');
 const { pool, query, setup } = require('./db');
+const push = require('./push');
 const { normalizeEmail, clean, parseListing } = require('./validation');
 
 const app = express();
@@ -141,6 +142,27 @@ app.delete('/api/admin/pilots/:id', auth, admin, safe(async (req, res) => {
   if (!deleted.rowCount) return sendError(res, 404, 'Pilot not found.');
   res.json({ ok: true });
 }));
+// Push notification settings for this device (one subscription per browser).
+app.get('/api/push/key', auth, safe(async (req, res) => res.json({ publicKey: (await push.vapidKeys()).publicKey })));
+app.post('/api/push/status', auth, safe(async (req, res) => {
+  const endpoint = typeof req.body.endpoint === 'string' ? req.body.endpoint : '';
+  const { rows } = await query('SELECT new_listings,my_exchanges FROM push_subscriptions WHERE endpoint=$1 AND pilot_id=$2', [endpoint, req.pilot.id]);
+  res.json({ newListings: !!rows[0]?.new_listings, myExchanges: !!rows[0]?.my_exchanges });
+}));
+app.post('/api/push/subscription', auth, safe(async (req, res) => {
+  const sub = push.parseSubscription(req.body.subscription);
+  if (!sub) return sendError(res, 400, 'This browser sent an invalid push subscription.');
+  const newListings = req.body.newListings === true, myExchanges = req.body.myExchanges === true;
+  if (!newListings && !myExchanges) {
+    await query('DELETE FROM push_subscriptions WHERE endpoint=$1', [sub.endpoint]);
+  } else {
+    // A device belongs to whoever last turned notifications on there.
+    await query(`INSERT INTO push_subscriptions(pilot_id,endpoint,p256dh,auth,new_listings,my_exchanges) VALUES($1,$2,$3,$4,$5,$6)
+      ON CONFLICT(endpoint) DO UPDATE SET pilot_id=EXCLUDED.pilot_id,p256dh=EXCLUDED.p256dh,auth=EXCLUDED.auth,
+      new_listings=EXCLUDED.new_listings,my_exchanges=EXCLUDED.my_exchanges`, [req.pilot.id, sub.endpoint, sub.p256dh, sub.auth, newListings, myExchanges]);
+  }
+  res.json({ newListings, myExchanges });
+}));
 app.get('/api/listings', auth, safe(async (req, res) => {
   const from = new Date(String(req.query.from || '')), to = new Date(String(req.query.to || ''));
   if (!Number.isFinite(+from) || !Number.isFinite(+to) || to <= from || to-from > 93*86400000) return sendError(res, 400, 'Select a date range of up to 93 days.');
@@ -159,6 +181,7 @@ app.post('/api/listings', auth, safe(async (req, res) => {
     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
     [req.pilot.id,l.intent,l.kind,l.startsAt,l.endsAt,l.flightNumber,l.crewRole,l.crewName,l.exchangeDates,l.exchangeFlights,l.details]);
   res.status(201).json({ id: String(rows[0].id) });
+  push.notifyNewListing({ id: rows[0].id, intent: l.intent, kind: l.kind, flight_number: l.flightNumber, starts_at: l.startsAt, ends_at: l.endsAt }, req.pilot);
 }));
 app.patch('/api/listings/:id', auth, safe(async (req, res) => {
   if (!/^\d+$/.test(req.params.id)) return sendError(res, 400, 'Invalid listing ID.');
@@ -168,13 +191,20 @@ app.patch('/api/listings/:id', auth, safe(async (req, res) => {
     [l.intent,l.kind,l.startsAt,l.endsAt,l.flightNumber,l.crewRole,l.crewName,l.exchangeDates,l.exchangeFlights,l.details,req.params.id,req.pilot.id]);
   if (!result.rowCount) return sendError(res, 403, 'Only the owner can edit an open listing.');
   res.json({ ok: true });
+  const interested = await query("SELECT from_pilot_id FROM interests WHERE listing_id=$1 AND status IN ('pending','accepted')", [req.params.id]);
+  push.notifyExchange(interested.rows.map(r => r.from_pilot_id), { title: `Listing updated: ${push.listingName({ kind: l.kind, flight_number: l.flightNumber })}`,
+    body: `${push.pilotName(req.pilot)} changed a listing you're interested in.`, tag: `listing-${req.params.id}` });
 }));
 app.delete('/api/listings/:id', auth, safe(async (req, res) => {
   if (!/^\d+$/.test(req.params.id)) return sendError(res, 400, 'Invalid listing ID.');
+  const interested = await query(`SELECT i.from_pilot_id FROM interests i JOIN listings l ON l.id=i.listing_id
+    WHERE i.listing_id=$1 AND l.owner_id=$2 AND i.status IN ('pending','accepted')`, [req.params.id, req.pilot.id]);
   // Interests in the listing are removed with it (ON DELETE CASCADE).
-  const result = await query('DELETE FROM listings WHERE id=$1 AND owner_id=$2 RETURNING id', [req.params.id, req.pilot.id]);
+  const result = await query('DELETE FROM listings WHERE id=$1 AND owner_id=$2 RETURNING id,kind,flight_number', [req.params.id, req.pilot.id]);
   if (!result.rowCount) return sendError(res, 403, 'Only the owner can delete a listing.');
   res.json({ ok: true });
+  push.notifyExchange(interested.rows.map(r => r.from_pilot_id), { title: `Listing removed: ${push.listingName(result.rows[0])}`,
+    body: `${push.pilotName(req.pilot)} deleted a listing you were interested in.`, tag: `listing-${req.params.id}` });
 }));
 app.post('/api/listings/:id/interest', auth, safe(async (req, res) => {
   if (!/^\d+$/.test(req.params.id)) return sendError(res, 400, 'Invalid listing ID.');
@@ -185,6 +215,9 @@ app.post('/api/listings/:id/interest', auth, safe(async (req, res) => {
     RETURNING id`, [req.params.id, req.pilot.id, message]);
   if (!rows.length) return sendError(res, 400, 'This listing is unavailable or belongs to you.');
   res.status(201).json({ ok: true });
+  const listing = (await query('SELECT owner_id,kind,flight_number FROM listings WHERE id=$1', [req.params.id])).rows[0];
+  if (listing) push.notifyExchange([listing.owner_id], { title: `New interest in ${push.listingName(listing)}`,
+    body: `${push.pilotName(req.pilot)} is interested${message ? `: ${message.slice(0, 120)}` : '.'}`, tag: `interest-${rows[0].id}` });
 }));
 app.get('/api/interests', auth, safe(async (req, res) => {
   const { rows } = await query(`SELECT i.id, i.listing_id, i.from_pilot_id, i.message, i.status, i.created_at,
@@ -200,28 +233,37 @@ app.post('/api/interests/:id/decision', auth, safe(async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { rows } = await client.query(`SELECT i.*,l.owner_id,l.status AS listing_status FROM interests i
+    const { rows } = await client.query(`SELECT i.*,l.owner_id,l.status AS listing_status,l.kind,l.flight_number FROM interests i
       JOIN listings l ON l.id=i.listing_id WHERE i.id=$1 FOR UPDATE OF i,l`, [req.params.id]);
     const i = rows[0];
     if (!i) { await client.query('ROLLBACK'); return sendError(res, 404, 'Interest not found.'); }
     if (String(i.owner_id) !== String(req.pilot.id) || i.status !== 'pending' || i.listing_status !== 'open') {
       await client.query('ROLLBACK'); return sendError(res, 403, 'Only the owner can decide on a pending interest for an open listing.');
     }
+    let others = [];
     if (req.body.decision === 'accepted') {
+      others = (await client.query("SELECT from_pilot_id FROM interests WHERE listing_id=$1 AND status='pending' AND id<>$2", [i.listing_id, i.id])).rows.map(r => r.from_pilot_id);
       await client.query("UPDATE listings SET status='matched',matched_with=$1,updated_at=NOW() WHERE id=$2", [i.from_pilot_id,i.listing_id]);
       await client.query("UPDATE interests SET status='declined',updated_at=NOW() WHERE listing_id=$1 AND status='pending' AND id<>$2", [i.listing_id, i.id]);
     }
     await client.query('UPDATE interests SET status=$1,updated_at=NOW() WHERE id=$2', [req.body.decision, i.id]);
     await client.query('COMMIT');
     res.json({ ok: true });
+    const name = push.listingName(i), owner = push.pilotName(req.pilot), accepted = req.body.decision === 'accepted';
+    push.notifyExchange([i.from_pilot_id], { title: `Interest ${accepted ? 'accepted' : 'declined'}: ${name}`,
+      body: accepted ? `${owner} accepted your interest. Coordinate the swap directly.` : `${owner} declined your interest.`, tag: `interest-${i.id}` });
+    push.notifyExchange(others, { title: `Interest declined: ${name}`, body: 'This listing was matched with another pilot.', tag: `listing-${i.listing_id}` });
   } catch (e) { await client.query('ROLLBACK').catch(() => {}); throw e; }
   finally { client.release(); }
 }));
 app.post('/api/interests/:id/withdraw', auth, safe(async (req, res) => {
   if (!/^\d+$/.test(req.params.id)) return sendError(res, 400, 'Invalid interest ID.');
-  const result = await query("UPDATE interests SET status='withdrawn',updated_at=NOW() WHERE id=$1 AND from_pilot_id=$2 AND status='pending' RETURNING id", [req.params.id,req.pilot.id]);
+  const result = await query("UPDATE interests SET status='withdrawn',updated_at=NOW() WHERE id=$1 AND from_pilot_id=$2 AND status='pending' RETURNING id,listing_id", [req.params.id,req.pilot.id]);
   if (!result.rowCount) return sendError(res, 403, 'You can only withdraw your own pending interest.');
   res.json({ ok: true });
+  const listing = (await query('SELECT owner_id,kind,flight_number FROM listings WHERE id=$1', [result.rows[0].listing_id])).rows[0];
+  if (listing) push.notifyExchange([listing.owner_id], { title: `Interest withdrawn: ${push.listingName(listing)}`,
+    body: `${push.pilotName(req.pilot)} withdrew their interest.`, tag: `interest-${req.params.id}` });
 }));
 // This is a matching board, not an official roster: actual duty swaps require separate company approval.
 app.use(express.static(path.join(__dirname, '..', 'public'), { index: 'index.html' }));
