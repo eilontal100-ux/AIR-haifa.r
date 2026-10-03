@@ -169,10 +169,11 @@ app.patch('/api/listings/:id', auth, safe(async (req, res) => {
   if (!result.rowCount) return sendError(res, 403, 'Only the owner can edit an open listing.');
   res.json({ ok: true });
 }));
-app.post('/api/listings/:id/close', auth, safe(async (req, res) => {
+app.delete('/api/listings/:id', auth, safe(async (req, res) => {
   if (!/^\d+$/.test(req.params.id)) return sendError(res, 400, 'Invalid listing ID.');
-  const result = await query("UPDATE listings SET status='closed',updated_at=NOW() WHERE id=$1 AND owner_id=$2 AND status='open' RETURNING id", [req.params.id,req.pilot.id]);
-  if (!result.rowCount) return sendError(res, 403, 'Only the owner can close an open listing.');
+  // Interests in the listing are removed with it (ON DELETE CASCADE).
+  const result = await query('DELETE FROM listings WHERE id=$1 AND owner_id=$2 RETURNING id', [req.params.id, req.pilot.id]);
+  if (!result.rowCount) return sendError(res, 403, 'Only the owner can delete a listing.');
   res.json({ ok: true });
 }));
 app.post('/api/listings/:id/interest', auth, safe(async (req, res) => {
