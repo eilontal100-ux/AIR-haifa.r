@@ -59,7 +59,7 @@ Orange = offered flights/shifts; blue = requested flights/shifts; green = matche
 
 ## API overview
 
-`GET /api/auth/options`, `POST /api/auth/password`, `POST /api/auth/login`, `GET /api/me`, `PATCH /api/me`, `POST /api/auth/logout`; `GET /api/pilots`, `POST /api/admin/pilots`, `DELETE /api/admin/pilots/:id`; `GET /api/listings?from=ISO&to=ISO`, `GET /api/listings/:id`, `POST /api/listings`, `PATCH /api/listings/:id`, `DELETE /api/listings/:id`, `POST /api/listings/:id/interest`; `GET /api/interests`, `POST /api/interests/:id/decision`, `POST /api/interests/:id/withdraw`. All APIs except requesting a login link require a valid session. Mutating APIs require a matching `Origin` header (browser `fetch` supplies one for JSON POST/PATCH/DELETE in normal modern browsers).
+`GET /api/auth/options`, `POST /api/auth/password`, `POST /api/auth/login`, `GET /api/me`, `PATCH /api/me`, `POST /api/auth/logout`; `GET /api/pilots`, `POST /api/admin/pilots`, `DELETE /api/admin/pilots/:id`; `GET /api/listings?from=ISO&to=ISO`, `GET /api/listings/:id`, `POST /api/listings`, `PATCH /api/listings/:id`, `DELETE /api/listings/:id`, `POST /api/listings/:id/unmatch`, `POST /api/listings/:id/interest`; `GET /api/interests`, `POST /api/interests/:id/decision`, `POST /api/interests/:id/withdraw`. All APIs except requesting a login link require a valid session. Mutating APIs require a matching `Origin` header (browser `fetch` supplies one for JSON POST/PATCH/DELETE in normal modern browsers).
 
 ## Important privacy boundaries
 
