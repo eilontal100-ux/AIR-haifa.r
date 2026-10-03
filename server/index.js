@@ -60,7 +60,7 @@ function listingJSON(row) {
   return { id: String(row.id), ownerId: String(row.owner_id), ownerEmail: row.owner_email, ownerName: row.owner_name,
     intent: row.intent, kind: row.kind, startsAt: row.starts_at, endsAt: row.ends_at, flightNumber: row.flight_number,
     crewRole: row.crew_role, crewName: row.crew_name, exchangeDates: row.exchange_dates,
-    exchangeFlights: row.exchange_flights, details: row.details, status: row.status, matchedEmail: row.matched_email,
+    exchangeFlights: row.exchange_flights, details: row.details, status: row.status, matchedEmail: row.matched_email, matchedWith: row.matched_with == null ? null : String(row.matched_with),
     interestCount: row.interest_count, createdAt: row.created_at };
 }
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
@@ -255,6 +255,30 @@ app.post('/api/interests/:id/decision', auth, safe(async (req, res) => {
     push.notifyExchange(others, { title: `Interest declined: ${name}`, body: 'This listing was matched with another pilot.', tag: `listing-${i.listing_id}` });
   } catch (e) { await client.query('ROLLBACK').catch(() => {}); throw e; }
   finally { client.release(); }
+}));
+// Cancel a match: either side can undo it, and the listing is open again.
+app.post('/api/listings/:id/unmatch', auth, safe(async (req, res) => {
+  if (!/^\d+$/.test(req.params.id)) return sendError(res, 400, 'Invalid listing ID.');
+  const client = await pool.connect();
+  let l;
+  try {
+    await client.query('BEGIN');
+    l = (await client.query('SELECT id,owner_id,matched_with,status,kind,flight_number FROM listings WHERE id=$1 FOR UPDATE', [req.params.id])).rows[0];
+    const me = String(req.pilot.id);
+    if (!l || l.status !== 'matched' || (String(l.owner_id) !== me && String(l.matched_with) !== me)) {
+      await client.query('ROLLBACK'); return sendError(res, 403, 'Only the two pilots in a match can cancel it.');
+    }
+    await client.query("UPDATE listings SET status='open',matched_with=NULL,updated_at=NOW() WHERE id=$1", [l.id]);
+    // The matched interest is closed: declined if the owner cancels, withdrawn if the other pilot does.
+    await client.query("UPDATE interests SET status=$1,updated_at=NOW() WHERE listing_id=$2 AND from_pilot_id=$3 AND status='accepted'",
+      [String(l.owner_id) === me ? 'declined' : 'withdrawn', l.id, l.matched_with]);
+    await client.query('COMMIT');
+  } catch (e) { await client.query('ROLLBACK').catch(() => {}); throw e; }
+  finally { client.release(); }
+  res.json({ ok: true });
+  const other = String(l.owner_id) === String(req.pilot.id) ? l.matched_with : l.owner_id;
+  push.notifyExchange([other], { title: `Match cancelled: ${push.listingName(l)}`,
+    body: `${push.pilotName(req.pilot)} cancelled the match. The listing is open again.`, tag: `listing-${l.id}` });
 }));
 app.post('/api/interests/:id/withdraw', auth, safe(async (req, res) => {
   if (!/^\d+$/.test(req.params.id)) return sendError(res, 400, 'Invalid interest ID.');
