@@ -15,7 +15,7 @@ function parseListing(body) {
   if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime()) || endsAt <= startsAt) throw new Error('Enter valid start and end times.');
   if (endsAt - startsAt > 7 * 24 * 3600000) throw new Error('A listing cannot span more than seven days.');
   const crewName = clean(body.crewName, 120);
-  if (!crewName) throw new Error('Enter the captain or first officer name.');
+  if (!crewName) throw new Error("Enter the other crew member's name.");
   const flightNumber = clean(body.flightNumber, 40).toUpperCase();
   if (kind === 'flight' && !flightNumber) throw new Error('Enter the flight number.');
   return { intent, kind, crewRole, startsAt, endsAt, crewName, flightNumber,

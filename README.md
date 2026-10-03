@@ -28,7 +28,7 @@ npm run db:setup
 npm start
 ```
 
-Open http://localhost:3000 and sign in with `ADMIN_EMAIL`. The first admin signs in, opens **Admin**, and adds the other **three approved pilots**. Each then signs in with their own address. Set your display name under **Pilots**.
+Open http://localhost:3000, enter the pilot password, then create your account with your email (the first account becomes the admin). Other pilots do the same with their own email.
 
 To run tests: `npm test`. To stop PostgreSQL without deleting data: `docker compose down`. **Do not** use `docker compose down -v` unless you intend to erase the local database.
 
@@ -48,7 +48,7 @@ Orange = offered flights/shifts; blue = requested flights/shifts; green = matche
 
 ## API overview
 
-`GET /api/auth/options`, `POST /api/auth/password`, `POST /api/auth/login`, `GET /api/me`, `PATCH /api/me`, `POST /api/auth/logout`; `GET /api/pilots`, `POST /api/admin/pilots`, `DELETE /api/admin/pilots/:id`; `GET /api/listings?from=ISO&to=ISO`, `GET /api/listings/:id`, `POST /api/listings`, `PATCH /api/listings/:id`, `POST /api/listings/:id/close`, `POST /api/listings/:id/interest`; `GET /api/interests`, `POST /api/interests/:id/decision`, `POST /api/interests/:id/withdraw`. All APIs except requesting a login link require a valid session. Mutating APIs require a matching `Origin` header (browser `fetch` supplies one for JSON POST/PATCH/DELETE in normal modern browsers).
+`GET /api/auth/options`, `POST /api/auth/password`, `POST /api/auth/login`, `GET /api/me`, `PATCH /api/me`, `POST /api/auth/logout`; `GET /api/pilots`, `POST /api/admin/pilots`, `DELETE /api/admin/pilots/:id`; `GET /api/listings?from=ISO&to=ISO`, `GET /api/listings/:id`, `POST /api/listings`, `PATCH /api/listings/:id`, `DELETE /api/listings/:id`, `POST /api/listings/:id/interest`; `GET /api/interests`, `POST /api/interests/:id/decision`, `POST /api/interests/:id/withdraw`. All APIs except requesting a login link require a valid session. Mutating APIs require a matching `Origin` header (browser `fetch` supplies one for JSON POST/PATCH/DELETE in normal modern browsers).
 
 ## Important privacy boundaries
 
