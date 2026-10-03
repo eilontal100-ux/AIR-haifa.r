@@ -42,6 +42,17 @@ The local address is only accessible from your computer. Deploy the **web server
 
 **Operational notes:** Keep your database backups and TLS certificates current. A single PostgreSQL database makes the board multi-user; no data resides only in one pilot's browser. This version uses refresh after interactions and does **not** use live push notifications, email alerts on new exchange requests, bidirectional official-roster integration, or automatic regulatory/duty-time checking. Users can manually refresh the calendar and inbox. No exchange takes effect until all required company scheduling and duty-time approvals are obtained.
 
+## Settings: dark mode and notifications
+
+The **Settings** tab lets each device choose a Light or Dark theme (saved in that browser) and turn push notifications on or off:
+
+- **New listings**: whenever anyone else posts an offer or request.
+- **My exchanges**: changes in your exchange inbox: interest in your listings, accepted or declined interest, withdrawn interest, and edits or removals of listings you are interested in.
+
+Notifications are per device. Tapping one opens the app. On iPhone and iPad (iOS 16.4+), they only work after adding the site to the Home Screen (Share → Add to Home Screen) and opening it from there. Signing out turns them off for that device.
+
+The server creates its web-push (VAPID) keys on first use and stores them in the database. To manage them yourself, set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` (generate with `npx web-push generate-vapid-keys`). Notification times use `APP_TIMEZONE` (default `Asia/Jerusalem`). With the built-in in-memory database, subscriptions are lost on restart, so pilots need to turn notifications on again; with `DATABASE_URL` they persist.
+
 ## Calendar behavior
 
 Orange = offered flights/shifts; blue = requested flights/shifts; green = matched. Click a colored entry to see details and send interest, or click a day number / **New exchange** to post. Browse months with arrows. After an owner accepts an interested pilot, the entry turns green; the pilots can use the directory to contact one another. "My listings" shows listings in the currently loaded date range; return to the matching calendar month for older listings.
