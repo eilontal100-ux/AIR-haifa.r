@@ -1,6 +1,6 @@
-# Air Haifa Pilot Swap
+# Pilot Swap
 
-Private, mobile-friendly shared calendar for a private group of pilots. One pilot is the administrator. Pilots can post flight/shift offers or requests, explain what dates and flights they would exchange, express interest, and accept/decline matches. The server and PostgreSQL database keep everyone's data in sync when they refresh or change months. This is an independent coordination board, **not an official Air Haifa product or roster system**.
+Private, mobile-friendly shared calendar for a private group of pilots. One pilot is the administrator. Pilots can post flight/shift offers or requests, explain what dates and flights they would exchange, express interest, and accept/decline matches. The server and PostgreSQL database keep everyone's data in sync when they refresh or change months. This is an independent coordination board, **not an official airline product or roster system**.
 
 ## Included
 
@@ -40,7 +40,7 @@ The local address is only accessible from your computer. Deploy the **web server
 
 **Security:** There is no limit on the number of pilot accounts. Admin cannot remove their own account. Sign-in does not verify email ownership. With `APP_PASSWORD` set, anyone who has the password can sign in with any email, and a new email joins as a pilot, so share it only with your pilots. Without `APP_PASSWORD`, only emails the admin has added can sign in, and anyone who types one of them gets in. Sign-in attempts are rate limited. (`ACCESS_CODE` is accepted as an older name for `APP_PASSWORD`.) Session cookies are HTTP-only, SameSite=Lax, and Secure on HTTPS production; sessions expire in seven days. Server checks request Origin and has request/login rate limits. Only the listing owner may change/close it or decide on interested pilots, and accepted matches atomically close out competing pending requests. Pilot emails are visible only to signed-in approved pilots. Existing revoked sessions and listings are deleted when an admin removes a pilot.
 
-**Operational notes:** Keep your database backups and TLS certificates current. A single PostgreSQL database makes the board multi-user; no data resides only in one pilot's browser. This version uses refresh after interactions and does **not** use live push notifications, email alerts on new exchange requests, bidirectional official-roster integration, or automatic regulatory/duty-time checking. Users can manually refresh the calendar and inbox. No exchange takes effect until all required company scheduling and duty-time approvals are obtained. The optional "Air Haifa" name is descriptive only; obtain company approval before branding or deployment.
+**Operational notes:** Keep your database backups and TLS certificates current. A single PostgreSQL database makes the board multi-user; no data resides only in one pilot's browser. This version uses refresh after interactions and does **not** use live push notifications, email alerts on new exchange requests, bidirectional official-roster integration, or automatic regulatory/duty-time checking. Users can manually refresh the calendar and inbox. No exchange takes effect until all required company scheduling and duty-time approvals are obtained.
 
 ## Calendar behavior
 
