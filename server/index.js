@@ -237,7 +237,7 @@ app.use((err, req, res, next) => {
 });
 if (require.main === module) {
   const port = Number(process.env.PORT || 3000);
-  app.listen(port, '0.0.0.0', () => console.log(`Air Haifa Swap listening at ${baseUrl}`));
+  app.listen(port, '0.0.0.0', () => console.log(`Pilot Swap listening at ${baseUrl}`));
   setup().catch(err => console.error('Database setup failed; will retry on the next request. Check DATABASE_URL (and DATABASE_SSL):', err.message));
 }
 module.exports = app;
