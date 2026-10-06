@@ -85,6 +85,8 @@
   function parseRoster(items, { zone = 'local', year, month } = {}) {
     const ref = { y: year ?? new Date().getFullYear(), m: month ?? new Date().getMonth() };
     const rows = groupRows(items);
+    const leon = leonColumns(rows);
+    if (leon) return parseLeon(rows, leon, ref, zone);
     const byDay = new Map();
     let cols = null, lastDate = null;
     const add = (date, f) => {
@@ -132,6 +134,84 @@
       duties.push({ startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), flightNumbers: [...new Set(day.flights)].join(', ').slice(0, 200),
         crewRole: day.role, otherCrew: [...new Set(day.crew.map(c => otherCrew(c, day.role)).filter(Boolean))].join(', ').replace(/\s+/g, ' ').slice(0, 120) });
     }
+    return { duties, warnings };
+  }
+
+  // ---- Leon "Printed By Leon" crew roster -----------------------------------
+  // Its header words are stacked ("Check" above "In"), each sector is its own row, the check-in
+  // time is only on a duty's first sector and the check-out only on its last, and the day label
+  // sits beside the middle of that day's rows. The crew column lists cockpit codes joined by "-",
+  // then "/" and the cabin crew, wrapped onto the lines just above and below the sector.
+  const cellText = c => String(c.str).trim();
+  const isTime = s => /^([01]?\d|2[0-3]):[0-5]\d$/.test(s);
+  function leonColumns(rows) {
+    for (const row of rows) {
+      if (!row.cells.some(c => /^description$/i.test(cellText(c)))) continue;
+      const band = rows.filter(r => r.page === row.page && Math.abs(r.y - row.y) <= 12).flatMap(r => r.cells);
+      const head = re => band.find(c => re.test(cellText(c)));
+      const checks = band.filter(c => /^check$/i.test(cellText(c))).sort((a, b) => a.x - b.x);
+      const func = head(/^function$/i);
+      if (checks.length < 2 || !func) continue;
+      const aircraft = head(/^aircraft$/i), crew = head(/^crew$/i), block = head(/^block$/i);
+      return { page: row.page, y: row.y, checkIn: checks[0].x, checkOut: checks[1].x, func: func.x,
+        dayEnd: aircraft ? aircraft.x - 3 : checks[0].x - 20, crew: crew && crew.x - 12, crewEnd: block ? block.x - 2 : Infinity };
+    }
+    return null;
+  }
+  function parseLeon(rows, col, ref, zone) {
+    const all = rows.flatMap(r => r.cells.map(c => ({ ...c, row: r })));
+    const after = label => { const c = all.find(i => label.test(cellText(i))); return c && c.row.cells.find(i => i.x > c.x && !label.test(cellText(i))); };
+    // The roster's own month and year beat the month picked in the app.
+    const month = MONTHS[cellText(after(/^month$/i) || { str: '' }).slice(0, 3).toLowerCase()], year = +cellText(after(/^year$/i) || { str: '' });
+    if (month !== undefined) ref = { ...ref, m: month };
+    if (year > 2000) ref = { ...ref, y: year };
+    const self = (cellText(after(/^name$/i) || { str: '' }).match(/^([A-Z]{2,5})\s*-/) || [])[1];
+    const body = rows.filter(r => r.page > col.page || (r.page === col.page && r.y < col.y - 8));
+    const labels = [];
+    for (const r of body) for (const c of r.cells) {
+      const date = c.x < col.dayEnd && parseDate(cellText(c), ref);
+      if (date) labels.push({ page: r.page, y: r.y, date });
+    }
+    const crewOf = row => {
+      if (col.crew === undefined) return [];
+      const text = body.filter(r => r.page === row.page && Math.abs(r.y - row.y) <= 9).flatMap(r => r.cells)
+        .filter(c => c.x >= col.crew && c.x < col.crewEnd).sort((a, b) => (b.y - a.y) || (a.x - b.x)).map(cellText).join(' ')
+        .replace(/\s*-\s*/g, '-');
+      return text.split('/')[0].split('-').map(s => s.trim()).filter(s => s && s !== self);
+    };
+    const duties = [], warnings = [];
+    let cur = null;
+    const close = end => {
+      const c = cur; cur = null;
+      const top = Math.max(...c.rows.map(r => r.y)) + 12, bottom = Math.min(...c.rows.map(r => r.y)) - 12, mid = (top + bottom) / 2;
+      const page = c.rows[0].page, before = labels.filter(l => l.page < page || (l.page === page && l.y > top));
+      const label = labels.filter(l => l.page === page && l.y <= top && l.y >= bottom).sort((a, b) => Math.abs(a.y - mid) - Math.abs(b.y - mid))[0] || before[before.length - 1];
+      if (!label) { warnings.push(`${c.flights.join(', ') || 'A duty'}: no date found, skipped`); return; }
+      const startsAt = makeDate(label.date, c.ci, zone);
+      let endsAt = end ? makeDate(label.date, end, zone) : new Date(+startsAt + 3600000);
+      if (endsAt <= startsAt) endsAt = makeDate(label.date, end, zone, 1); // ends after midnight
+      duties.push({ startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), flightNumbers: [...new Set(c.flights)].join(', ').slice(0, 200),
+        crewRole: c.role, otherCrew: [...new Set(c.crew)].join(', ').slice(0, 120) });
+    };
+    for (const row of body) {
+      const desc = row.cells.find(c => c.x > col.checkIn + 10 && c.x < col.checkOut && !isTime(cellText(c)));
+      const clock = row.cells.filter(c => isTime(cellText(c)) && c.x < col.func);
+      if (!desc || !clock.length) continue; // days off, vacation and empty days have no times
+      const ci = clock.find(c => c.x < desc.x), rest = clock.filter(c => c.x > desc.x).sort((a, b) => a.x - b.x);
+      // After the description come the departure and arrival times, then the check-out on a duty's last row.
+      const co = rest.length >= 3 ? rest[rest.length - 1] : null, arrival = rest[Math.min(rest.length, 2) - 1];
+      if (ci) { if (cur) close(cur.arrival); cur = { ci: times(cellText(ci))[0], rows: [], flights: [], role: '', crew: [] }; }
+      if (!cur) continue;
+      cur.rows.push(row);
+      cur.flights.push(cellText(desc));
+      if (arrival) cur.arrival = times(cellText(arrival))[0];
+      const fn = row.cells.find(c => c.x >= col.func - 5 && c.x <= col.func + 30);
+      if (!cur.role && fn) cur.role = roleFrom(cellText(fn));
+      cur.crew.push(...crewOf(row));
+      if (co) close(times(cellText(co))[0]);
+    }
+    if (cur) close(cur.arrival);
+    duties.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
     return { duties, warnings };
   }
 
