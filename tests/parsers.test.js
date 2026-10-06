@@ -70,3 +70,32 @@ test('detects whether roster times are UTC or local', () => {
   assert.strictEqual(detectZone([{ str: 'All times local' }]), 'local');
   assert.strictEqual(detectZone([{ str: 'Crew Roster' }]), '');
 });
+
+test('reads the Leon "Printed By Leon" layout: stacked headers, one row per sector, date beside the day', () => {
+  const at = (x, y, str, page = 1) => ({ str, x, y, w: 20, page });
+  const header = [at(29, 821, 'All times in UTC'), at(69, 743, 'NAME'), at(226, 743, 'ABC - Test Pilot'), at(66, 723, 'MONTH'), at(233, 723, 'MARCH'),
+    at(408, 723, 'YEAR'), at(511, 723, '2027'), at(81, 688, 'Aircraft'), at(127, 688, 'Check'), at(277, 688, 'Check'), at(42, 683, 'Day'),
+    at(190, 683, 'Description'), at(310, 683, 'Function'), at(369, 683, 'Crew'), at(410, 683, 'Block'), at(87, 679, 'Type'), at(137, 679, 'In'), at(283, 679, 'Out')];
+  const sector = (y, flight, std, sta, extra = []) => [at(159, y, flight), at(170, y, std), at(204, y, 'AAA'), at(235, y, 'BBB'), at(265, y, sta),
+    at(331, y, 'FO'), at(364, y + 4, 'XYZ-ABC /'), at(362, y - 4, 'CAB-INN'), at(416, y, '01:00'), ...extra];
+  const items = [...header,
+    at(39, 660, '01 Mar'), at(44, 653, 'Mon'), at(235, 660, 'BBB'), // an empty day
+    ...sector(630, 'XX101', '04:30', '05:30', [at(128, 630, '03:50')]),
+    at(33, 618, '02 Mar Tue'),
+    ...sector(606, 'XX102', '06:15', '07:20', [at(294, 606, '07:40')]),
+    at(32, 584, '03 Mar Wed'), at(157, 584, 'OFF - First Priority'),
+    at(39, 560, '04 Mar'), at(128, 560, '04:45'), at(157, 560, 'Short call'), at(202, 560, '04:45'), at(265, 560, '16:45'), at(294, 560, '16:45'),
+    ...sector(540, 'XX201', '22:00', '23:30', [at(128, 540, '21:20')]),
+    at(39, 528, '05 Mar'),
+    ...sector(516, 'XX202', '00:15', '01:20', [at(294, 516, '01:40')]),
+  ];
+  const { duties, warnings } = parseRoster(items, { zone: 'utc', year: 2026, month: 0 });
+  assert.deepStrictEqual(warnings, []);
+  assert.strictEqual(duties.length, 3);
+  assert.deepStrictEqual(duties[0], { startsAt: '2027-03-02T03:50:00.000Z', endsAt: '2027-03-02T07:40:00.000Z',
+    flightNumbers: 'XX101, XX102', crewRole: 'first_officer', otherCrew: 'XYZ' });
+  assert.strictEqual(duties[1].flightNumbers, 'Short call');
+  assert.strictEqual(duties[1].endsAt, '2027-03-04T16:45:00.000Z');
+  assert.strictEqual(duties[2].startsAt, '2027-03-05T21:20:00.000Z');
+  assert.strictEqual(duties[2].endsAt, '2027-03-06T01:40:00.000Z'); // after midnight
+});
