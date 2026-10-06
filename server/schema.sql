@@ -68,3 +68,16 @@ CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+-- Each pilot's own flights, imported from their Leon roster PDF. Only the pilot sees them.
+CREATE TABLE IF NOT EXISTS roster_duties (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  pilot_id BIGINT NOT NULL REFERENCES pilots(id) ON DELETE CASCADE,
+  starts_at TIMESTAMPTZ NOT NULL,
+  ends_at TIMESTAMPTZ NOT NULL,
+  flight_numbers TEXT NOT NULL DEFAULT '',
+  crew_role TEXT NOT NULL DEFAULT '',
+  other_crew TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT valid_duty_times CHECK (ends_at > starts_at)
+);
+CREATE INDEX IF NOT EXISTS idx_roster_pilot ON roster_duties(pilot_id, starts_at);

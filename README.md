@@ -53,14 +53,26 @@ Notifications are per device. Tapping one opens the app. On iPhone and iPad (iOS
 
 The server creates its web-push (VAPID) keys on first use and stores them in the database. To manage them yourself, set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` (generate with `npx web-push generate-vapid-keys`). Notification times use `APP_TIMEZONE` (default `Asia/Jerusalem`). With the built-in in-memory database, subscriptions are lost on restart, so pilots need to turn notifications on again; with `DATABASE_URL` they persist.
 
+## Time zone
+
+**Settings → Time** chooses whether this device shows and enters times in its **local time** or in **UTC** (saved in that browser). The calendar shows the current choice next to the month name, and the start/end fields in the exchange form are labelled with it.
+
+## My flights (Leon roster import)
+
+**Import roster** (above the calendar) reads a roster PDF exported from Leon and adds your duties to your own calendar in purple: the report (check-in) time, end (check-out) time and flight numbers, plus your function and the other crew member when the PDF has those columns. Choose the month and whether the file's times are UTC or local (detected from the file when it says so), check the preview, then add. Importing a month again replaces that month; **Remove month** deletes your imported flights for it. The PDF is read in the browser with pdf.js and never uploaded; only the extracted duties are saved, and only you can see them. Tap one of your flights and **Offer this flight** to post it as an exchange with the details filled in. Roster layouts vary, so the reader looks for a header row with Check-in and Check-out columns; always check the preview.
+
+## Describe it in your own words
+
+When posting a new exchange, you can type a short message in English or Hebrew (for example "Giving away 6H 123 on 14/11, 06:00-14:30, captain, with Dana") and tap **Fill in the form**. The app recognizes giving/looking for, flight or shift, flight number, date, times, role and the other crew member, puts your message in the notes, and leaves everything for you to check before publishing. This runs on your device; no text is sent to any outside service.
+
 ## Calendar behavior
 
-Orange = offered flights/shifts; blue = requested flights/shifts; green = matched. Click a colored entry to see details and send interest, or click a day number / **New exchange** to post. Browse months with arrows. After an owner accepts an interested pilot, the entry turns green; the pilots can use the directory to contact one another. "My listings" shows listings in the currently loaded date range; return to the matching calendar month for older listings.
+Orange = offered flights/shifts; blue = requested flights/shifts; green = matched; purple = your own imported flights (visible only to you). Click a colored entry to see details and send interest, or click a day number / **New exchange** to post. Browse months with arrows. After an owner accepts an interested pilot, the entry turns green; the pilots can use the directory to contact one another. "My listings" shows listings in the currently loaded date range; return to the matching calendar month for older listings.
 
 ## API overview
 
-`GET /api/auth/options`, `POST /api/auth/password`, `POST /api/auth/login`, `GET /api/me`, `PATCH /api/me`, `POST /api/auth/logout`; `GET /api/pilots`, `POST /api/admin/pilots`, `DELETE /api/admin/pilots/:id`; `GET /api/listings?from=ISO&to=ISO`, `GET /api/listings/:id`, `POST /api/listings`, `PATCH /api/listings/:id`, `DELETE /api/listings/:id`, `POST /api/listings/:id/unmatch`, `POST /api/listings/:id/interest`; `GET /api/interests`, `POST /api/interests/:id/decision`, `POST /api/interests/:id/withdraw`. All APIs except requesting a login link require a valid session. Mutating APIs require a matching `Origin` header (browser `fetch` supplies one for JSON POST/PATCH/DELETE in normal modern browsers).
+`GET /api/auth/options`, `POST /api/auth/password`, `POST /api/auth/login`, `GET /api/me`, `PATCH /api/me`, `POST /api/auth/logout`; `GET /api/pilots`, `POST /api/admin/pilots`, `DELETE /api/admin/pilots/:id`; `GET /api/listings?from=ISO&to=ISO`, `GET /api/listings/:id`, `POST /api/listings`, `PATCH /api/listings/:id`, `DELETE /api/listings/:id`, `POST /api/listings/:id/unmatch`, `POST /api/listings/:id/interest`; `GET /api/interests`, `POST /api/interests/:id/decision`, `POST /api/interests/:id/withdraw`; `GET /api/roster?from=ISO&to=ISO`, `POST /api/roster/import`, `DELETE /api/roster?from=ISO&to=ISO` (your own imported flights only). All APIs except requesting a login link require a valid session. Mutating APIs require a matching `Origin` header (browser `fetch` supplies one for JSON POST/PATCH/DELETE in normal modern browsers).
 
 ## Important privacy boundaries
 
-Do not enter passenger details, full roster exports, private company operational records, or other sensitive information. All signed-in pilots can see all listings and one another's approved email addresses. Obtain appropriate permission and company approval before using this for real crew scheduling.
+Do not enter passenger details, private company operational records, or other sensitive information. All signed-in pilots can see all listings and one another's approved email addresses. Imported roster flights are visible only to the pilot who imported them. Obtain appropriate permission and company approval before using this for real crew scheduling.
