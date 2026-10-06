@@ -22,4 +22,19 @@ function parseListing(body) {
     exchangeDates: clean(body.exchangeDates, 250), exchangeFlights: clean(body.exchangeFlights, 250).toUpperCase(),
     details: clean(body.details, 1200) };
 }
-module.exports = { normalizeEmail, clean, parseListing };
+
+// Flights from a pilot's imported roster: { from, to, duties: [...] }. Throws with a message for the pilot.
+function parseRosterImport(body) {
+  const from = new Date(body?.from), to = new Date(body?.to);
+  if (!Number.isFinite(+from) || !Number.isFinite(+to) || to <= from || to - from > 45 * 86400000) throw new Error('Choose one month to import.');
+  if (!Array.isArray(body.duties) || body.duties.length > 120) throw new Error('The roster has too many entries to import at once.');
+  const duties = body.duties.map(d => {
+    const startsAt = new Date(d?.startsAt), endsAt = new Date(d?.endsAt);
+    if (!Number.isFinite(+startsAt) || !Number.isFinite(+endsAt) || endsAt <= startsAt || endsAt - startsAt > 2 * 86400000) throw new Error('A flight in the roster has invalid times.');
+    if (startsAt < from || startsAt >= to) throw new Error('A flight in the roster is outside the chosen month.');
+    return { startsAt, endsAt, flightNumbers: clean(d.flightNumbers, 200).toUpperCase(),
+      crewRole: ['captain', 'first_officer'].includes(d.crewRole) ? d.crewRole : '', otherCrew: clean(d.otherCrew, 120) };
+  });
+  return { from, to, duties };
+}
+module.exports = { normalizeEmail, clean, parseListing, parseRosterImport };
