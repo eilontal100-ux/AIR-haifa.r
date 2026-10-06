@@ -8,7 +8,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const { pool, query, setup } = require('./db');
 const push = require('./push');
-const { normalizeEmail, clean, parseListing } = require('./validation');
+const { normalizeEmail, clean, parseListing, parseRosterImport } = require('./validation');
 
 const app = express();
 const prod = process.env.NODE_ENV === 'production';
@@ -22,7 +22,9 @@ const accessCode = process.env.APP_PASSWORD || process.env.ACCESS_CODE || '';
 app.disable('x-powered-by');
 app.set('trust proxy', prod ? 1 : 'loopback');
 app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'"], imgSrc: ["'self'", 'data:'], connectSrc: ["'self'"], formAction: ["'self'"], objectSrc: ["'none'"] } } }));
-app.use(express.json({ limit: '20kb' }));
+// A month of imported roster flights is larger than any other request.
+const smallJson = express.json({ limit: '20kb' }), rosterJson = express.json({ limit: '100kb' });
+app.use((req, res, next) => (req.path === '/api/roster/import' ? rosterJson : smallJson)(req, res, next));
 app.use(cookieParser());
 // Only failed sign-ins count, so pilots sharing a network are not blocked by each other.
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 7, skipSuccessfulRequests: true, standardHeaders: 'draft-7', legacyHeaders: false });
@@ -289,6 +291,47 @@ app.post('/api/interests/:id/withdraw', auth, safe(async (req, res) => {
   if (listing) push.notifyExchange([listing.owner_id], { title: `Interest withdrawn: ${push.listingName(listing)}`,
     body: `${push.pilotName(req.pilot)} withdrew their interest.`, tag: `interest-${req.params.id}` });
 }));
+// The signed-in pilot's own roster flights (imported from their Leon PDF). Nobody else can read them.
+const dutyJSON = r => ({ id: String(r.id), startsAt: r.starts_at, endsAt: r.ends_at, flightNumbers: r.flight_numbers, crewRole: r.crew_role, otherCrew: r.other_crew });
+function rangeFrom(q) {
+  const from = new Date(String(q.from || '')), to = new Date(String(q.to || ''));
+  return Number.isFinite(+from) && Number.isFinite(+to) && to > from && to - from <= 93 * 86400000 ? { from, to } : null;
+}
+app.get('/api/roster', auth, safe(async (req, res) => {
+  const r = rangeFrom(req.query);
+  if (!r) return sendError(res, 400, 'Select a date range of up to 93 days.');
+  const { rows } = await query('SELECT * FROM roster_duties WHERE pilot_id=$1 AND starts_at<$3 AND ends_at>$2 ORDER BY starts_at', [req.pilot.id, r.from, r.to]);
+  res.json({ duties: rows.map(dutyJSON) });
+}));
+// Importing a month replaces that month's previously imported flights, so re-importing an updated roster is safe.
+app.post('/api/roster/import', auth, safe(async (req, res) => {
+  let r; try { r = parseRosterImport(req.body); } catch (e) { return sendError(res, 400, e.message); }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM roster_duties WHERE pilot_id=$1 AND starts_at>=$2 AND starts_at<$3', [req.pilot.id, r.from, r.to]);
+    for (const d of r.duties) {
+      await client.query('INSERT INTO roster_duties(pilot_id,starts_at,ends_at,flight_numbers,crew_role,other_crew) VALUES($1,$2,$3,$4,$5,$6)',
+        [req.pilot.id, d.startsAt, d.endsAt, d.flightNumbers, d.crewRole, d.otherCrew]);
+    }
+    await client.query('COMMIT');
+  } catch (e) { await client.query('ROLLBACK').catch(() => {}); throw e; }
+  finally { client.release(); }
+  res.status(201).json({ imported: r.duties.length });
+}));
+// Removes the pilot's own imported flights for a month (e.g. a wrong file was imported).
+app.delete('/api/roster', auth, safe(async (req, res) => {
+  const r = rangeFrom(req.query);
+  if (!r) return sendError(res, 400, 'Select a date range of up to 93 days.');
+  const result = await query('DELETE FROM roster_duties WHERE pilot_id=$1 AND starts_at>=$2 AND starts_at<$3', [req.pilot.id, r.from, r.to]);
+  res.json({ removed: result.rowCount });
+}));
+// The PDF reader runs in the browser, so roster files never leave the pilot's device.
+const pdfjsDir = path.dirname(require.resolve('pdfjs-dist/package.json'));
+const mjsType = { setHeaders: (res, file) => { if (file.endsWith('.mjs')) res.type('text/javascript'); } };
+app.use('/vendor/pdfjs/build', express.static(path.join(pdfjsDir, 'legacy', 'build'), mjsType));
+app.use('/vendor/pdfjs/cmaps', express.static(path.join(pdfjsDir, 'cmaps')));
+app.use('/vendor/pdfjs/standard_fonts', express.static(path.join(pdfjsDir, 'standard_fonts')));
 // This is a matching board, not an official roster: actual duty swaps require separate company approval.
 app.use(express.static(path.join(__dirname, '..', 'public'), { index: 'index.html' }));
 // Errors that mean the database is unreachable or misconfigured, not a bug in a request.
