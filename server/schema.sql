@@ -81,3 +81,14 @@ CREATE TABLE IF NOT EXISTS roster_duties (
   CONSTRAINT valid_duty_times CHECK (ends_at > starts_at)
 );
 CREATE INDEX IF NOT EXISTS idx_roster_pilot ON roster_duties(pilot_id, starts_at);
+-- A pilot's roster link (a Leon roster PDF or calendar subscription), checked when they open the app.
+-- The link works like a password for their roster, so it is never sent back to the browser.
+CREATE TABLE IF NOT EXISTS roster_links (
+  pilot_id BIGINT PRIMARY KEY REFERENCES pilots(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  zone TEXT NOT NULL DEFAULT 'utc',
+  synced_at TIMESTAMPTZ,
+  checked_at TIMESTAMPTZ,
+  last_error TEXT NOT NULL DEFAULT '',
+  last_count INTEGER NOT NULL DEFAULT 0
+);

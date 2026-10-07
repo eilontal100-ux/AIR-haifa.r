@@ -8,6 +8,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const { pool, query, setup } = require('./db');
 const push = require('./push');
+const { syncRoster } = require('./rosterSync');
 const { normalizeEmail, clean, parseListing, parseRosterImport } = require('./validation');
 
 const app = express();
@@ -326,7 +327,43 @@ app.delete('/api/roster', auth, safe(async (req, res) => {
   const result = await query('DELETE FROM roster_duties WHERE pilot_id=$1 AND starts_at>=$2 AND starts_at<$3', [req.pilot.id, r.from, r.to]);
   res.json({ removed: result.rowCount });
 }));
-// The PDF reader runs in the browser, so roster files never leave the pilot's device.
+// A saved roster link keeps the pilot's flights up to date. The link itself is never sent back.
+const linkJSON = l => (l ? { linked: true, site: new URL(l.url).host, zone: l.zone, syncedAt: l.synced_at, checkedAt: l.checked_at, error: l.last_error, count: l.last_count } : { linked: false });
+const syncFailed = e => { if (!e.userMessage) console.error('Roster sync failed', e); return e.userMessage || 'Could not update your flights from the link. Try again later.'; };
+app.get('/api/roster/link', auth, safe(async (req, res) => {
+  const { rows } = await query('SELECT * FROM roster_links WHERE pilot_id=$1', [req.pilot.id]);
+  res.json({ link: linkJSON(rows[0]) });
+}));
+app.put('/api/roster/link', auth, safe(async (req, res) => {
+  const url = clean(req.body?.url, 2000), zone = req.body?.zone === 'local' ? 'local' : 'utc';
+  if (!url) return sendError(res, 400, 'Paste the link to your roster.');
+  // Saved only when it works, so a mistyped link does not replace a good one.
+  let count; try { count = await syncRoster(pool, req.pilot.id, { url, zone }); } catch (e) { return sendError(res, 400, syncFailed(e)); }
+  const { rows } = await query(`INSERT INTO roster_links(pilot_id,url,zone,synced_at,checked_at,last_error,last_count) VALUES($1,$2,$3,NOW(),NOW(),'',$4)
+    ON CONFLICT(pilot_id) DO UPDATE SET url=EXCLUDED.url, zone=EXCLUDED.zone, synced_at=NOW(), checked_at=NOW(), last_error='', last_count=EXCLUDED.last_count RETURNING *`, [req.pilot.id, url, zone, count]);
+  res.json({ link: linkJSON(rows[0]), imported: count });
+}));
+// Forgets the link. Flights already imported stay on the calendar.
+app.delete('/api/roster/link', auth, safe(async (req, res) => {
+  await query('DELETE FROM roster_links WHERE pilot_id=$1', [req.pilot.id]);
+  res.json({ link: linkJSON(null) });
+}));
+// Called whenever the app opens or comes back to the screen; the link is fetched at most every 10 minutes
+// (every 30 seconds when the pilot taps Update now).
+app.post('/api/roster/sync', auth, safe(async (req, res) => {
+  const wait = req.body?.force === true ? 30 * 1000 : 10 * 60 * 1000;
+  const { rows } = await query('UPDATE roster_links SET checked_at=NOW() WHERE pilot_id=$1 AND (checked_at IS NULL OR checked_at<$2) RETURNING *', [req.pilot.id, new Date(Date.now() - wait)]);
+  if (!rows.length) {
+    const current = await query('SELECT * FROM roster_links WHERE pilot_id=$1', [req.pilot.id]);
+    return res.json({ link: linkJSON(current.rows[0]), changed: false });
+  }
+  let count = null, error = '';
+  try { count = await syncRoster(pool, req.pilot.id, rows[0]); } catch (e) { error = syncFailed(e); }
+  const saved = await query(count === null ? 'UPDATE roster_links SET last_error=$2 WHERE pilot_id=$1 RETURNING *'
+    : "UPDATE roster_links SET synced_at=NOW(), last_error='', last_count=$2 WHERE pilot_id=$1 RETURNING *", [req.pilot.id, count === null ? error : count]);
+  res.json({ link: linkJSON(saved.rows[0]), changed: count !== null });
+}));
+// The PDF reader runs in the browser, so uploaded roster files never leave the pilot's device.
 const pdfjsDir = path.dirname(require.resolve('pdfjs-dist/package.json'));
 const mjsType = { setHeaders: (res, file) => { if (file.endsWith('.mjs')) res.type('text/javascript'); } };
 app.use('/vendor/pdfjs/build', express.static(path.join(pdfjsDir, 'legacy', 'build'), mjsType));
