@@ -215,6 +215,59 @@
     return { duties, warnings };
   }
 
+  // ---- Calendar subscription (iCal) -----------------------------------------
+  // The real moment of a wall-clock time in an IANA time zone such as "Asia/Jerusalem".
+  function wallToUtc(y, m, d, h, mi, tz) {
+    const fmt = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' });
+    const offset = t => { const p = Object.fromEntries(fmt.formatToParts(t).map(x => [x.type, x.value])); return Date.UTC(+p.year, p.month - 1, +p.day, +p.hour, +p.minute) - Math.floor(t / 60000) * 60000; };
+    const wall = Date.UTC(y, m, d, h, mi);
+    return new Date(wall - offset(wall - offset(wall)));
+  }
+  // Returns { duties, warnings } like parseRoster. Sectors with short gaps between them become one duty;
+  // all-day events (days off, vacation) and cancelled events are left out. `tz` is used for
+  // times without a zone when `zone` is 'local'.
+  function parseICal(text, { zone = 'utc', tz } = {}) {
+    const unescape = s => String(s || '').replace(/\\n/gi, ' ').replace(/\\([,;\\])/g, '$1').trim();
+    const events = [];
+    let ev = null;
+    for (const line of String(text || '').replace(/\r?\n[ \t]/g, '').split(/\r?\n/)) {
+      if (/^BEGIN:VEVENT$/i.test(line)) ev = {};
+      else if (/^END:VEVENT$/i.test(line)) { if (ev) events.push(ev); ev = null; }
+      else if (ev) {
+        const i = line.indexOf(':');
+        if (i < 0) continue;
+        const [name, ...params] = line.slice(0, i).split(';');
+        ev[name.toUpperCase()] = { value: line.slice(i + 1), params: Object.fromEntries(params.map(p => p.split('=')).map(([k, v]) => [k.toUpperCase(), String(v || '').replace(/^"|"$/g, '')])) };
+      }
+    }
+    const when = p => {
+      const x = p && p.value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})\d{0,2}(Z?)$/);
+      if (!x) return null;
+      const [y, m, d, h, mi] = [+x[1], x[2] - 1, +x[3], +x[4], +x[5]];
+      const name = x[6] ? 'UTC' : p.params.TZID || (zone === 'utc' ? 'UTC' : tz);
+      if (name === 'UTC') return new Date(Date.UTC(y, m, d, h, mi));
+      if (!name) return new Date(y, m, d, h, mi);
+      try { return wallToUtc(y, m, d, h, mi, name); } catch { return new Date(Date.UTC(y, m, d, h, mi)); }
+    };
+    const sectors = events.filter(e => !/^cancelled$/i.test(e.STATUS?.value || '')).map(e => {
+      const start = when(e.DTSTART), end = when(e.DTEND) || (start && new Date(+start + 3600000));
+      return start && end > start && { start, end, summary: unescape(e.SUMMARY?.value), text: `${unescape(e.SUMMARY?.value)} ${unescape(e.DESCRIPTION?.value)}` };
+    }).filter(Boolean).sort((a, b) => a.start - b.start);
+    const duties = [];
+    let cur = null;
+    const close = () => { if (!cur) return; const f = [...new Set(cur.flights)]; duties.push({ startsAt: cur.start.toISOString(), endsAt: cur.end.toISOString(),
+      flightNumbers: (f.length ? f : [...new Set(cur.summaries)]).join(', ').slice(0, 200), crewRole: cur.role, otherCrew: '' }); cur = null; };
+    for (const s of sectors) {
+      if (cur && (s.start - cur.end > 3 * 3600000 || s.end - cur.start > 20 * 3600000)) close();
+      if (!cur) cur = { start: s.start, end: s.end, flights: [], summaries: [], role: '' };
+      if (s.end > cur.end) cur.end = s.end;
+      cur.flights.push(...flights(s.summary)); if (s.summary) cur.summaries.push(s.summary);
+      if (!cur.role) cur.role = roleFrom(s.text);
+    }
+    close();
+    return { duties, warnings: [] };
+  }
+
   // ---- Free-text listing ----------------------------------------------------
   // Reads a message like "Giving away 6H 123 on 14/10, 06:00-14:30, captain, with Dana. Prefer a morning flight."
   // (or in Hebrew) and returns form fields. Anything it is unsure about is left out for the pilot to fill in.
@@ -258,5 +311,5 @@
     const utc = /\b(UTC|GMT|Zulu)\b/i.test(text), local = /\blocal\b|\bLT\b/i.test(text);
     return utc && !local ? 'utc' : local && !utc ? 'local' : '';
   }
-  return { parseRoster, parseFreeText, parseDate, groupRows, detectZone };
+  return { parseRoster, parseICal, wallToUtc, parseFreeText, parseDate, groupRows, detectZone };
 }));

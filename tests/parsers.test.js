@@ -99,3 +99,23 @@ test('reads the Leon "Printed By Leon" layout: stacked headers, one row per sect
   assert.strictEqual(duties[2].startsAt, '2027-03-05T21:20:00.000Z');
   assert.strictEqual(duties[2].endsAt, '2027-03-06T01:40:00.000Z'); // after midnight
 });
+
+test('reads a calendar subscription: sectors close together become one duty, days off are left out', () => {
+  const { parseICal } = require('../public/parsers');
+  const ics = ['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'DTSTART:20270302T043000Z', 'DTEND:20270302T053000Z', 'SUMMARY:XX101 AAA-BBB', 'DESCRIPTION:Function: FO', 'END:VEVENT',
+    'BEGIN:VEVENT', 'DTSTART:20270302T061500Z', 'DTEND:20270302T072000Z', 'SUMMARY:XX102 BBB-AAA', 'END:VEVENT',
+    'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20270303', 'SUMMARY:OFF', 'END:VEVENT',
+    'BEGIN:VEVENT', 'DTSTART;TZID=Asia/Jerusalem:20270304T074500', 'DTEND;TZID=Asia/Jerusalem:20270304T194500', 'SUMMARY:Short call', 'END:VEVENT',
+    'BEGIN:VEVENT', 'DTSTART:20270305T043000Z', 'DTEND:20270305T053000Z', 'SUMMARY:XX103', 'STATUS:CANCELLED', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+  const { duties } = parseICal(ics);
+  assert.strictEqual(duties.length, 2);
+  assert.deepStrictEqual(duties[0], { startsAt: '2027-03-02T04:30:00.000Z', endsAt: '2027-03-02T07:20:00.000Z', flightNumbers: 'XX 101, XX 102', crewRole: 'first_officer', otherCrew: '' });
+  assert.strictEqual(duties[1].flightNumbers, 'Short call');
+  assert.strictEqual(duties[1].startsAt, '2027-03-04T05:45:00.000Z'); // 07:45 in Israel (UTC+2 in March before DST)
+});
+
+test('roster links cannot point at private or local addresses', () => {
+  const { isBlocked } = require('../server/rosterSync');
+  for (const ip of ['127.0.0.1', '10.1.2.3', '192.168.0.10', '169.254.169.254', '::1', '::ffff:127.0.0.1', 'fd00::1']) assert.strictEqual(isBlocked(ip), true, ip);
+  for (const ip of ['8.8.8.8', '2606:4700::1111']) assert.strictEqual(isBlocked(ip), false, ip);
+});
