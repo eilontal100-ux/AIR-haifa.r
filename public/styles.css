@@ -267,6 +267,8 @@ button.danger:hover:not(:disabled){background:var(--danger-bg)}
 .settings-card h3{margin:0 0 2px;font-size:16px;font-weight:600}
 .settings-card>p{margin:0 0 14px;font-size:13px;color:var(--muted)}
 .settings-card a{font-weight:600}
+.link-btn{display:inline-flex;align-items:center;min-height:34px;padding:6px 14px;border-radius:var(--radius-sm);background:var(--brand);color:var(--brand-ink)!important;font-size:13px;text-decoration:none;white-space:nowrap}
+.link-btn:hover{background:var(--brand-hover)}
 .setting-row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 0;border-top:1px solid var(--border)}
 .setting-row strong{display:block;font-size:14px;font-weight:600}
 .setting-row small{display:block;max-width:440px;margin-top:2px;font-size:13px;line-height:1.5;color:var(--muted)}

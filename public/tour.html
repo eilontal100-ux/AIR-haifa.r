@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pilot Swap Tour</title>
+<link rel="stylesheet" href="/tour.css">
+</head>
+<body>
+<svg class="sprite" width="0" height="0" aria-hidden="true"><defs>
+<symbol id="plane" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></symbol>
+<symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+<symbol id="right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="share" viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8"/></symbol>
+<symbol id="book" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-2zM8 3v18"/></symbol>
+<symbol id="tabs" viewBox="0 0 24 24"><rect x="4" y="4" width="13" height="13" rx="2"/><path d="M8 20h10a2 2 0 0 0 2-2V8"/></symbol>
+<symbol id="addsq" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></symbol>
+<symbol id="copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+<symbol id="star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></symbol>
+<symbol id="glasses" viewBox="0 0 24 24"><circle cx="6.5" cy="15" r="3.5"/><circle cx="17.5" cy="15" r="3.5"/><path d="M10 15h4M3 15 5 7M21 15l-2-8"/></symbol>
+<symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+<symbol id="wand" viewBox="0 0 24 24"><path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z"/></symbol>
+<symbol id="cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+<symbol id="mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></symbol>
+<symbol id="cam" viewBox="0 0 24 24"><path d="M4 7h4l2-3h4l2 3h4v13H4z"/><circle cx="12" cy="13" r="4"/></symbol>
+<symbol id="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
+<symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="map" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></symbol>
+<symbol id="note" viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5z"/><path d="M9 9h6M9 13h6M9 17h4"/></symbol>
+<symbol id="img" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></symbol>
+</defs></svg>
+
+<main class="tour">
+  <div class="side left">
+    <a class="back" href="/">← Back to Pilot Swap</a>
+    <div class="intro">
+      <h1>How to use Pilot Swap</h1>
+      <p>Watch the app being used, start to finish. Tap a chapter to jump to it.</p>
+    </div>
+    <ol class="chapters" id="chapters"></ol>
+  </div>
+
+  <div class="stagewrap" id="stagewrap">
+    <div class="scaler" id="scaler">
+      <div class="phone" id="phone" aria-hidden="true">
+        <div class="screen" id="screen"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="side right">
+    <div class="caption" aria-live="polite">
+      <small id="chNo">Chapter 1 of 10</small>
+      <h2 id="chTitle">Sign in</h2>
+      <p id="capText">Open the Pilot Swap link and enter the pilot password.</p>
+      <div class="bar"><i id="barFill"></i></div>
+      <div class="controls">
+        <button id="bPlay" class="primary">Pause</button>
+        <button id="bPrevCh">Previous</button>
+        <button id="bNextCh">Next</button>
+        <button id="bRestart">Restart</button>
+      </div>
+    </div>
+    <p class="foot">The names and flights in this tour are examples.<br><a class="dl" href="/tour.mp4" download="pilot-swap-tour.mp4">Download the video (MP4)</a></p>
+  </div>
+</main>
+
+<template id="tpl">
+  <div class="island"></div>
+  <div class="status" id="status"><span>9:41</span><span class="sig"><b></b><i></i></span></div>
+
+  <!-- Sign in -->
+  <div class="login" id="login">
+    <div class="lg-art">
+      <div class="brand"><span class="mark"><svg class="svg"><use href="#plane"/></svg></span>Pilot Swap</div>
+      <h1>More flexibility.<br>One shared calendar.</h1>
+    </div>
+    <div class="lg-form" id="lgPw">
+      <h2>Welcome aboard</h2>
+      <p>Enter the pilot password to continue.</p>
+      <label class="l">Password</label>
+      <div class="field" id="fPw" data-ph="Pilot password"></div>
+      <span class="btn primary full" id="bContinue">Continue →</span>
+    </div>
+    <div class="lg-form hide" id="lgAcct">
+      <h2>Your account</h2>
+      <p>New here? Enter your email to create your account. Already have one? Enter the same email to sign in.</p>
+      <label class="l">Email</label>
+      <div class="field" id="fEmail" data-ph="name@example.com"></div>
+      <label class="l">Your name</label>
+      <div class="field" id="fName" data-ph="How other pilots will see you"></div>
+      <span class="btn primary full" id="bSignin">Create account / Sign in →</span>
+    </div>
+  </div>
+
+  <!-- App -->
+  <div class="app hide" id="app">
+    <div class="a-head">
+      <div class="a-row"><span class="brand"><span class="mark"><svg class="svg"><use href="#plane"/></svg></span>Pilot Swap</span><span class="avatar">D</span></div>
+      <nav class="tabs">
+        <span class="tab on" id="tCal">Calendar</span>
+        <span class="tab" id="tMine">My listings</span>
+        <span class="tab" id="tInbox">Exchange inbox<b class="badge hide" id="badge">1</b></span>
+        <span class="tab" id="tSet">Settings</span>
+      </nav>
+    </div>
+    <div class="a-body">
+      <div class="pg scroll" id="pgCal">
+        <div class="pg-title">
+          <h2>Shared calendar</h2>
+          <p>See what's available and coordinate your next exchange.</p>
+          <span class="btn primary" id="bNew"><svg class="svg"><use href="#plus"/></svg>New exchange</span>
+        </div>
+        <div class="card summary" id="summary">
+          <div><small><i class="dot offer"></i>Available to take</small><b id="nOffer">3</b></div>
+          <div><small><i class="dot request"></i>Requests for coverage</small><b id="nReq">2</b></div>
+          <div><small><i class="dot matched"></i>Matched this month</small><b id="nMatch">0</b></div>
+        </div>
+        <div class="card" id="calcard">
+          <div class="cal-tb">
+            <span class="rnd" id="bPrev"><svg class="svg"><use href="#left"/></svg></span>
+            <b id="month">October 2026</b>
+            <span class="rnd" id="bNext"><svg class="svg"><use href="#right"/></svg></span>
+            <span class="btn sm" id="bToday">Today</span>
+          </div>
+          <div class="legend" id="legend">
+            <span id="lgO"><i class="dot offer"></i>Offered</span>
+            <span id="lgR"><i class="dot request"></i>Requested</span>
+            <span id="lgG"><i class="dot matched"></i>Matched</span>
+            <span id="lgM"><i class="dot mine"></i>My flights</span>
+          </div>
+          <div class="grid" id="grid"></div>
+        </div>
+      </div>
+
+      <div class="pg scroll hide" id="pgMine">
+        <div class="pg-title"><h2>My listings</h2><p>Manage flights and shifts you have posted.</p></div>
+        <div class="card list" id="mineList"></div>
+      </div>
+
+      <div class="pg scroll hide" id="pgInbox">
+        <div class="pg-title"><h2>Exchange inbox</h2><p>Interest in your listings, and interest you sent.</p></div>
+        <div class="card list">
+          <div class="row" id="interest">
+            <span class="pill request" id="intPill">Pending</span>
+            <h4>Interest from Noa Bar</h4>
+            <p>HFA 853 · Sat, 24 Oct · 10:50–17:50</p>
+            <div class="msg">I'd love to take this one. I can give you the 29th in return.</div>
+            <div class="acts" id="intActs"><span class="btn primary sm" id="bAccept">Accept match</span><span class="btn sm">Decline</span></div>
+            <p class="hide gap" id="intDone">Matched. Coordinate directly with Noa and get airline approval.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="pg scroll hide" id="pgSet">
+        <div class="pg-title"><h2>Settings</h2><p>Appearance and notifications for this device.</p></div>
+        <div class="card set"><h3>Appearance</h3><p>Choose how Pilot Swap looks on this device.</p>
+          <div class="srow"><div><b>Theme</b><small>Dark mode is easier on the eyes at night.</small></div><span class="seg"><span class="on" id="sLight">Light</span><span id="sDark">Dark</span></span></div></div>
+        <div class="card set"><h3>Time</h3><p>How flight times are shown and entered.</p>
+          <div class="srow"><div><b>Time zone</b><small>Local follows this phone's clock. UTC is the same for everyone.</small></div><span class="seg"><span class="on" id="sLocal">Local</span><span id="sUtc">UTC</span></span></div></div>
+        <div class="card set" id="notifCard"><h3>Notifications</h3><p>Get alerts even when Pilot Swap is closed.</p>
+          <div class="srow"><div><b>New listings</b><small>When anyone posts an offer or request.</small></div><span class="seg"><span id="nNewYes">Yes</span><span class="on" id="nNewNo">No</span></span></div>
+          <div class="srow"><div><b>My exchanges</b><small>Interest in your listings and answers to yours.</small></div><span class="seg"><span id="nMyYes">Yes</span><span class="on" id="nMyNo">No</span></span></div>
+          <div class="pstat" id="pstat">Notifications are off on this device.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dialog sheet -->
+  <div class="veil" id="veil"></div>
+  <div class="sheet" id="sheet">
+    <div class="sh-head"><div><small id="shEye"></small><h3 id="shTitle"></h3></div><span class="x" id="bClose"><svg class="svg"><use href="#x"/></svg></span></div>
+    <div class="sh-body scroll" id="shBody"></div>
+    <div class="sh-foot" id="shFoot"></div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <!-- iOS -->
+  <div class="saf-top"></div>
+  <div class="saf-bot" id="safBot">
+    <div class="urlpill"><svg class="svg"><use href="#lock"/></svg>Pilot Swap website</div>
+    <div class="tools"><svg class="svg off"><use href="#left"/></svg><svg class="svg off"><use href="#right"/></svg><svg class="svg" id="bShare"><use href="#share"/></svg><svg class="svg"><use href="#book"/></svg><svg class="svg"><use href="#tabs"/></svg></div>
+  </div>
+  <div class="share" id="shareSheet">
+    <div class="hd"><span class="mark"><svg class="svg"><use href="#plane"/></svg></span><div><b>Pilot Swap</b><small>Options ›</small></div></div>
+    <div class="grp"><div class="it">Copy<svg class="svg"><use href="#copy"/></svg></div><div class="it">Add to Reading List<svg class="svg"><use href="#glasses"/></svg></div><div class="it">Add Bookmark<svg class="svg"><use href="#book"/></svg></div><div class="it">Add to Favourites<svg class="svg"><use href="#star"/></svg></div></div>
+    <div class="grp"><div class="it" id="rowA2HS">Add to Home Screen<svg class="svg"><use href="#addsq"/></svg></div></div>
+  </div>
+  <div class="a2hs" id="a2hs">
+    <div class="nav"><span>Cancel</span><b>Add to Home Screen</b><span class="add" id="bAdd">Add</span></div>
+    <div class="box"><span class="mark"><svg class="svg"><use href="#plane"/></svg></span><div>Pilot Swap<small>Pilot Swap website</small></div></div>
+    <p>An icon will be added to your Home Screen so you can quickly access this website.</p>
+  </div>
+  <div class="home" id="home">
+    <div class="icons">
+      <span class="ico"><i><svg class="svg"><use href="#cal"/></svg></i>Calendar</span>
+      <span class="ico"><i><svg class="svg"><use href="#img"/></svg></i>Photos</span>
+      <span class="ico"><i><svg class="svg"><use href="#cam"/></svg></i>Camera</span>
+      <span class="ico"><i><svg class="svg"><use href="#mail"/></svg></i>Mail</span>
+      <span class="ico"><i><svg class="svg"><use href="#clock"/></svg></i>Clock</span>
+      <span class="ico"><i><svg class="svg"><use href="#map"/></svg></i>Maps</span>
+      <span class="ico"><i><svg class="svg"><use href="#note"/></svg></i>Notes</span>
+      <span class="ico"><i><svg class="svg"><use href="#gear"/></svg></i>Settings</span>
+      <span class="ico ps" id="icoPS"><i><svg class="svg"><use href="#plane"/></svg></i>Pilot Swap</span>
+    </div>
+    <div class="dock"><i></i><i></i><i></i><i></i></div>
+  </div>
+  <div class="veil2" id="veil2"></div>
+  <div class="ialert" id="ialert">
+    <div class="tx"><b>"Pilot Swap" Would Like to Send You Notifications</b><small>Notifications may include alerts, sounds and icon badges. These can be configured in Settings.</small></div>
+    <div class="bt"><span>Don't Allow</span><span id="bAllow">Allow</span></div>
+  </div>
+  <div class="banner" id="banner">
+    <span class="mark"><svg class="svg"><use href="#plane"/></svg></span>
+    <div class="t"><b>Pilot Swap<small>now</small></b>New listing: HFA 805<br>Avi Levi is offering Thu, 29 Oct · 06:30–14:00</div>
+  </div>
+
+  <div class="finger" id="finger"></div>
+</template>
+
+<script src="/tour.js"></script>
+</body>
+</html>
