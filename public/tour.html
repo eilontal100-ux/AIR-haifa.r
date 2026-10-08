@@ -52,7 +52,7 @@
 
   <div class="side right">
     <div class="caption" aria-live="polite">
-      <small id="chNo">Chapter 1 of 10</small>
+      <small id="chNo">Chapter 1 of 11</small>
       <h2 id="chTitle">Sign in</h2>
       <p id="capText">Open the Pilot Swap link and enter the pilot password.</p>
       <div class="bar"><i id="barFill"></i></div>
@@ -130,6 +130,7 @@
             <span id="lgR"><i class="dot request"></i>Requested</span>
             <span id="lgG"><i class="dot matched"></i>Matched</span>
             <span id="lgM"><i class="dot mine"></i>My flights</span>
+            <span class="btn sm" id="bImport">Import roster</span>
           </div>
           <div class="grid" id="grid"></div>
         </div>
@@ -168,6 +169,29 @@
     </div>
   </div>
 
+  <!-- Leon, in Safari -->
+  <div class="leon hide" id="leon">
+    <div class="ln-bar"><b>LEON</b><span class="ln-me" id="lnMe">Dana Cohen ▾</span></div>
+    <div class="ln-body scroll">
+      <div id="lnHome">
+        <h3>My schedule</h3>
+        <div class="ln-row"><small>Thu 8 Oct</small>HFA801 · HFA802</div>
+        <div class="ln-row"><small>Sat 17 Oct</small>HFA853</div>
+        <div class="ln-row"><small>Tue 20 Oct</small>Standby</div>
+      </div>
+      <div class="hide" id="lnProf">
+        <h3>User profile</h3>
+        <div class="ln-tabs"><span>Basic information</span><span>Personal certificates</span><span>Ratings</span><span>User settings</span><span id="lnCalTab">Calendars</span><span>Login history</span></div>
+        <div class="ln-hint" id="lnHint">Choose a tab.</div>
+        <div class="hide" id="lnCals">
+          <div class="ln-cal" id="lnFlights"><b>My flights</b><code>https://your-operator.leon.aero/calendars/person_flights/?t=••••••••</code><span class="btn sm" id="lnCopy">Copy</span></div>
+          <div class="ln-cal"><b>My trips</b><code>https://your-operator.leon.aero/calendars/operations/?t=••••••••</code></div>
+          <div class="ln-cal"><b>My duty roster</b><code>https://your-operator.leon.aero/calendars/cdr/?t=••••••••</code></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Dialog sheet -->
   <div class="veil" id="veil"></div>
   <div class="sheet" id="sheet">
@@ -180,7 +204,7 @@
   <!-- iOS -->
   <div class="saf-top"></div>
   <div class="saf-bot" id="safBot">
-    <div class="urlpill"><svg class="svg"><use href="#lock"/></svg>Pilot Swap website</div>
+    <div class="urlpill"><svg class="svg"><use href="#lock"/></svg><span id="urlText">Pilot Swap website</span></div>
     <div class="tools"><svg class="svg off"><use href="#left"/></svg><svg class="svg off"><use href="#right"/></svg><svg class="svg" id="bShare"><use href="#share"/></svg><svg class="svg"><use href="#book"/></svg><svg class="svg"><use href="#tabs"/></svg></div>
   </div>
   <div class="share" id="shareSheet">

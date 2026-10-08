@@ -281,3 +281,26 @@ body.video .caption small{font-size:15px}
 .back:hover{color:var(--text)}
 .dl{display:inline-block;margin-top:10px;color:var(--accent);font-size:14px;font-weight:600}
 body.video .back,body.video .dl{display:none}
+
+/* ================= Leon ================= */
+.leon{position:absolute;inset:0;padding-top:50px;padding-bottom:84px;display:flex;flex-direction:column;background:#f4f6f9;color:#16202c}
+.ln-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#0f4c81;color:#fff}
+.ln-bar b{letter-spacing:.08em;font-size:14px}
+.ln-me{padding:4px 9px;border-radius:6px;background:rgba(255,255,255,.14);font-weight:600;font-size:12px}
+.ln-body{flex:1;overflow:auto;padding:14px}
+.leon h3{margin:0 0 10px;font-size:16px}
+.ln-row{padding:9px 11px;margin-bottom:6px;border-radius:8px;background:#fff;border:1px solid #dfe4ea;font-weight:600;font-size:12.5px}
+.ln-row small{display:block;font-weight:500;color:#667085}
+.ln-tabs{display:flex;flex-wrap:wrap;gap:5px}
+.ln-tabs span{padding:4px 8px;border-radius:6px;border:1px solid #dfe4ea;background:#fff;font-size:11px}
+.ln-tabs span.on{background:#fff3c4;border-color:#d9a400;font-weight:700}
+.ln-hint{margin-top:14px;color:#667085;font-size:12px}
+#lnCals{margin-top:14px;display:grid;gap:8px}
+.ln-cal{padding:10px 11px;border-radius:8px;background:#fff;border:1px solid #dfe4ea}
+.ln-cal b{display:block;font-size:12.5px}
+.ln-cal code{display:block;margin:3px 0 0;font-size:10.5px;color:#1f5f99;word-break:break-all}
+.ln-cal .btn{margin-top:8px}
+.sheet .sub{margin:2px 0 0;font-size:13.5px}
+.sheet .sub.or{margin-top:18px;padding-top:12px;border-top:1px solid var(--border)}
+.lstat{margin:8px 0 2px;padding:8px 10px;border-radius:8px;background:var(--matched-bg);color:var(--matched-ink);font-size:11.5px}
+.sheet .btn.full{margin-top:10px}
